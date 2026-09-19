@@ -1,0 +1,49 @@
+# Python
+.venv/
+**/.venv/
+__pycache__/
+**/__pycache__/
+*.py[cod]
+.pytest_cache/
+*.egg-info/
+.mypy_cache/
+.ruff_cache/
+
+# Flutter / Dart
+**/.dart_tool/
+frontend/.flutter-plugins
+frontend/.flutter-plugins-dependencies
+frontend/.packages
+frontend/build/*
+!frontend/build/web/
+!frontend/build/web/**
+frontend/.pub-cache/
+frontend/.pub/
+private_signal_app/build/
+
+# IDE
+.idea/
+**/.idea/
+*.iml
+.vscode/
+.cursor/
+
+tools/*.exe
+tools/cloudflared.exe
+
+# Secrets and credentials — do not ignore all JSON
+.env
+.env.*
+*.pem
+*.p12
+*.pfx
+*.key
+!frontend/web/**
+credentials.json
+*-credentials.json
+*serviceAccount*.json
+*firebase-adminsdk*.json
+*-firebase-adminsdk-*.json
+**/secrets/**
+google-application-credentials.json
+FIREBASE_SERVICE_ACCOUNT_JSON
