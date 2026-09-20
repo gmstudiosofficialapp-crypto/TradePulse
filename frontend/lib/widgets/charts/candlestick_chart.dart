@@ -33,6 +33,7 @@ class CandlestickChart extends StatefulWidget {
 class _CandlestickChartState extends State<CandlestickChart> {
   double _zoom = 1;
   double _pan = 0;
+  double _gestureZoom = 1;
 
   void _zoomBy(double factor) {
     setState(() {
@@ -75,76 +76,6 @@ class _CandlestickChartState extends State<CandlestickChart> {
         color: colors.chart,
         child: Column(
           children: [
-            if (!widget.immersive)
-            Padding(
-              padding: const EdgeInsets.fromLTRB(12, 8, 8, 0),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      const Expanded(
-                        child: Text(
-                          '1M CANDLES',
-                          overflow: TextOverflow.ellipsis,
-                          style: TextStyle(
-                            fontSize: 11,
-                            letterSpacing: 0.8,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      ),
-                      _ChartTool(
-                        icon: Icons.zoom_in,
-                        tooltip: 'Zoom in',
-                        onTap: () => _zoomBy(1.2),
-                      ),
-                      _ChartTool(
-                        icon: Icons.zoom_out,
-                        tooltip: 'Zoom out',
-                        onTap: () => _zoomBy(1 / 1.2),
-                      ),
-                      _ChartTool(
-                        icon: Icons.fit_screen,
-                        tooltip: 'Reset zoom',
-                        onTap: _reset,
-                      ),
-                    ],
-                  ),
-                  if (widget.entries.isNotEmpty || widget.spans.isNotEmpty)
-                    Padding(
-                      padding: const EdgeInsets.only(bottom: 6),
-                      child: Wrap(
-                        spacing: 8,
-                        runSpacing: 4,
-                        children: [
-                          for (final entry in widget.entries)
-                            Text(
-                              '${entry.direction} ${AppUtils.formatPrice(entry.entryPrice)}',
-                              style: TextStyle(
-                                fontSize: 10,
-                                fontWeight: FontWeight.w700,
-                                color: entry.direction == 'BUY'
-                                    ? colors.success
-                                    : colors.danger,
-                              ),
-                            ),
-                          for (final span in widget.spans)
-                            Text(
-                              '${span.direction} HOLD',
-                              style: TextStyle(
-                                fontSize: 10,
-                                color: span.direction == 'BUY'
-                                    ? colors.success
-                                    : colors.danger,
-                              ),
-                            ),
-                        ],
-                      ),
-                    ),
-                ],
-              ),
-            ),
             if (widget.height == null)
               Expanded(child: _immersiveBody(colors))
             else
@@ -160,44 +91,7 @@ class _CandlestickChartState extends State<CandlestickChart> {
   }
 
   Widget _immersiveBody(TradePulseColors colors) {
-    final body = _chartBody(colors);
-    if (!widget.immersive) return body;
-    return Stack(
-      children: [
-        Positioned.fill(child: body),
-        Positioned(
-          left: widget.overlayInsets.left + 8,
-          bottom: widget.overlayInsets.bottom + 8,
-          child: DecoratedBox(
-            decoration: BoxDecoration(
-              color: colors.card.withValues(alpha: 0.72),
-              borderRadius: BorderRadius.circular(10),
-              border: Border.all(color: colors.cardBorder.withValues(alpha: 0.5)),
-            ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                _ChartTool(
-                  icon: Icons.zoom_in,
-                  tooltip: 'Zoom in',
-                  onTap: () => _zoomBy(1.2),
-                ),
-                _ChartTool(
-                  icon: Icons.zoom_out,
-                  tooltip: 'Zoom out',
-                  onTap: () => _zoomBy(1 / 1.2),
-                ),
-                _ChartTool(
-                  icon: Icons.fit_screen,
-                  tooltip: 'Reset zoom',
-                  onTap: _reset,
-                ),
-              ],
-            ),
-          ),
-        ),
-      ],
-    );
+    return _chartBody(colors);
   }
 
   Widget _chartBody(TradePulseColors colors) {
@@ -217,19 +111,21 @@ class _CandlestickChartState extends State<CandlestickChart> {
       },
       child: GestureDetector(
         behavior: HitTestBehavior.opaque,
-        onTap: () {},
+        onDoubleTap: _reset,
+        onScaleStart: (_) => _gestureZoom = _zoom,
         onScaleUpdate: (details) {
           if (details.pointerCount >= 2 && details.scale != 1.0) {
-            _zoomBy(details.scale > 1 ? 1.04 : 0.96);
+            setState(() {
+              _zoom = (_gestureZoom * details.scale).clamp(1.0, 8.0);
+              _pan = _pan.clamp(0, _maxPan);
+            });
           } else {
             setState(() {
               _pan = (_pan - details.focalPointDelta.dx / 8).clamp(0, _maxPan);
             });
           }
         },
-        child: Stack(
-          children: [
-            CustomPaint(
+        child: CustomPaint(
               painter: _CandlePainter(
                 candles: _visible,
                 entries: {
@@ -248,49 +144,7 @@ class _CandlestickChartState extends State<CandlestickChart> {
               ),
               child: const SizedBox.expand(),
             ),
-            if (!widget.immersive)
-            const IgnorePointer(
-              child: Align(
-                alignment: Alignment.bottomLeft,
-                child: Padding(
-                  padding: EdgeInsets.fromLTRB(14, 0, 0, 28),
-                  child: Text(
-                    'DEMO  ·  SIMULATED OTC',
-                    style: TextStyle(
-                      fontSize: 10,
-                      letterSpacing: 0.6,
-                      color: Color(0x55FFFFFF),
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ),
-              ),
-            ),
-          ],
-        ),
       ),
-    );
-  }
-}
-
-class _ChartTool extends StatelessWidget {
-  const _ChartTool({
-    required this.icon,
-    required this.tooltip,
-    required this.onTap,
-  });
-
-  final IconData icon;
-  final String tooltip;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return IconButton(
-      visualDensity: VisualDensity.compact,
-      tooltip: tooltip,
-      onPressed: onTap,
-      icon: Icon(icon, size: 18),
     );
   }
 }

@@ -5,7 +5,9 @@ import 'package:flutter/material.dart';
 
 import '../../core/constants/app_constants.dart';
 import '../../core/constants/otc_assets.dart';
+import '../../core/routes/app_routes.dart';
 import '../../core/services/app_scope.dart';
+import '../../core/services/settings_controller.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/utils/app_utils.dart';
 import '../../models/chart_entry.dart';
@@ -13,6 +15,7 @@ import '../../models/market_models.dart';
 import '../../models/trade_models.dart';
 import '../../core/services/trading_controller.dart';
 import '../../widgets/brand/asset_icon.dart';
+import '../../widgets/buttons/pressable.dart';
 import '../../widgets/cards/premium_card.dart';
 import '../../widgets/charts/candlestick_chart.dart';
 
@@ -61,9 +64,34 @@ class _TradeScreenState extends State<TradeScreen> {
   }
 
   Future<void> _place(String direction) async {
+    if (AppScope.settings(context).isLiveMode) {
+      await _showLiveBlocked();
+      return;
+    }
     final market = AppScope.market(context);
     final trading = AppScope.trading(context);
     await trading.openTrade(asset: market.focusedAsset, direction: direction);
+  }
+
+  Future<void> _showLiveBlocked() async {
+    if (!mounted) return;
+    await showDialog<void>(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text('Insufficient Balance'),
+          content: const Text(
+            'Your live balance is \$0.00.\nLive trading is unavailable.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('OK'),
+            ),
+          ],
+        );
+      },
+    );
   }
 
   Future<void> _selectAsset(String symbol) async {
@@ -77,13 +105,17 @@ class _TradeScreenState extends State<TradeScreen> {
   Widget build(BuildContext context) {
     final market = AppScope.market(context);
     final trading = AppScope.trading(context);
+    final settings = AppScope.settings(context);
     final live = market.status.state == EngineState.liveSimulation;
     final reconnecting = market.status.state == EngineState.reconnecting;
     final signal = trading.signal.asset == market.focusedAsset
         ? trading.signal
         : TradeSignal.waiting(market.focusedAsset);
-    final canTrade =
-        live && trading.canOpenTrade(market.focusedAsset);
+    final liveUi = settings.isLiveMode;
+    final canTrade = liveUi
+        ? !trading.submitting
+        : live && trading.canOpenTrade(market.focusedAsset);
+    final quote = market.quotes[market.focusedAsset];
 
     final panel = _ManualTradePanel(
       trading: trading,
@@ -113,22 +145,13 @@ class _TradeScreenState extends State<TradeScreen> {
 
     final hasPositions =
         trading.activeTrades.isNotEmpty || trading.lastResult != null;
-    final utc = DateTime.now().toUtc();
-    final utcStamp =
-        '${utc.hour.toString().padLeft(2, '0')}:${utc.minute.toString().padLeft(2, '0')}:${utc.second.toString().padLeft(2, '0')}UTC';
 
     return Scaffold(
       backgroundColor: Colors.transparent,
       body: LayoutBuilder(
         builder: (context, constraints) {
           final watchWidth = math.min(280.0, constraints.maxWidth - 24);
-          const ticketReserve = 220.0;
-          final chartInsets = EdgeInsets.fromLTRB(
-            8,
-            56,
-            8,
-            ticketReserve + (hasPositions ? 88 : 8),
-          );
+          const ticketReserve = 236.0;
 
           return Stack(
             children: [
@@ -139,25 +162,23 @@ class _TradeScreenState extends State<TradeScreen> {
                   spans: spans,
                   highlightId: _highlightId,
                   immersive: true,
-                  overlayInsets: chartInsets,
                 ),
               ),
               Positioned(
-                top: 10,
+                top: 8,
                 left: 12,
-                right: 72,
-                child: _ChartHud(
+                right: 12,
+                child: _TradeTopBar(
                   asset: market.focusedAsset,
-                  utcStamp: utcStamp,
+                  price: quote?.price,
                   reconnecting: reconnecting,
-                  signal: signal,
                   onToggleWatchlist: () =>
                       setState(() => _watchlistOpen = !_watchlistOpen),
                 ),
               ),
               if (_watchlistOpen)
                 Positioned(
-                  top: 58,
+                  top: 96,
                   left: 12,
                   bottom: ticketReserve + 16,
                   width: watchWidth,
@@ -175,6 +196,7 @@ class _TradeScreenState extends State<TradeScreen> {
                         padding: const EdgeInsets.fromLTRB(10, 0, 10, 8),
                         child: lifecycle,
                       ),
+                    _SentimentBar(signal: signal),
                     panel,
                   ],
                 ),
@@ -187,64 +209,372 @@ class _TradeScreenState extends State<TradeScreen> {
   }
 }
 
-class _ChartHud extends StatelessWidget {
-  const _ChartHud({
+class _TradeTopBar extends StatelessWidget {
+  const _TradeTopBar({
     required this.asset,
-    required this.utcStamp,
+    required this.price,
     required this.reconnecting,
-    required this.signal,
     required this.onToggleWatchlist,
   });
 
   final String asset;
-  final String utcStamp;
+  final double? price;
   final bool reconnecting;
-  final TradeSignal signal;
   final VoidCallback onToggleWatchlist;
 
   @override
   Widget build(BuildContext context) {
     final colors = context.tpColors;
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: onToggleWatchlist,
-        borderRadius: BorderRadius.circular(10),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: 4),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  AssetIcon(symbol: asset, size: 26),
-                  const SizedBox(width: 8),
-                  Flexible(
-                    child: Text(
-                      asset,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.w700,
-                      ),
+    final user = AppScope.auth(context).user;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Row(
+          children: [
+            Pressable(
+              onPressed: () {
+                Navigator.of(context).pushReplacementNamed(AppRoutes.profile);
+              },
+              child: CircleAvatar(
+                radius: 16,
+                backgroundColor: colors.accent.withValues(alpha: 0.18),
+                child: Text(
+                  user?.initials ?? 'TP',
+                  style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700),
+                ),
+              ),
+            ),
+            const Spacer(),
+            const _ModeBalanceControl(),
+          ],
+        ),
+        const SizedBox(height: 10),
+        Row(
+          children: [
+            Expanded(
+              child: Material(
+                color: Colors.transparent,
+                child: InkWell(
+                  onTap: onToggleWatchlist,
+                  borderRadius: BorderRadius.circular(10),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 2),
+                    child: Row(
+                      children: [
+                        AssetIcon(symbol: asset, size: 26),
+                        const SizedBox(width: 8),
+                        Flexible(
+                          child: Text(
+                            asset,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ),
+                        Icon(Icons.expand_more, color: colors.mutedText, size: 22),
+                      ],
                     ),
                   ),
-                  const SizedBox(width: 4),
-                  Icon(Icons.expand_more, color: colors.mutedText),
-                ],
+                ),
               ),
-              const SizedBox(height: 2),
+            ),
+            const SizedBox(width: 8),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                Text(
+                  price == null ? '—' : AppUtils.formatPrice(price!),
+                  style: const TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w700,
+                    fontFeatures: [FontFeature.tabularFigures()],
+                  ),
+                ),
+                if (reconnecting)
+                  Text(
+                    'RECONNECTING',
+                    style: TextStyle(fontSize: 11, color: colors.mutedText),
+                  ),
+              ],
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+}
+
+class _ModeBalanceControl extends StatelessWidget {
+  const _ModeBalanceControl();
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.tpColors;
+    final settings = AppScope.settings(context);
+    final trading = AppScope.trading(context);
+    final live = settings.isLiveMode;
+    final label = live ? 'LIVE' : 'DEMO';
+    final balance = live ? 0.0 : trading.demoDisplayBalance;
+
+    return Pressable(
+      onPressed: () => _openSheet(context),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 220),
+        padding: const EdgeInsets.fromLTRB(10, 6, 10, 6),
+        decoration: BoxDecoration(
+          color: colors.card.withValues(alpha: 0.88),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: colors.cardBorder.withValues(alpha: 0.8)),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.w800,
+                letterSpacing: 0.6,
+                color: live ? colors.danger : colors.accent,
+              ),
+            ),
+            Icon(Icons.expand_more, size: 16, color: colors.mutedText),
+            const SizedBox(width: 8),
+            AnimatedSwitcher(
+              duration: const Duration(milliseconds: 220),
+              child: Text(
+                AppUtils.formatMoney(balance),
+                key: ValueKey('$label-$balance'),
+                style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _openSheet(BuildContext context) async {
+    final settings = AppScope.settings(context);
+    final trading = AppScope.trading(context);
+    await showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: context.tpColors.card,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(18)),
+      ),
+      builder: (sheetContext) {
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Text('Trading mode', style: Theme.of(sheetContext).textTheme.titleMedium),
+                const SizedBox(height: 12),
+                _ModeTile(
+                  title: 'DEMO MODE',
+                  subtitle: 'Simulated balance and trading',
+                  selected: !settings.isLiveMode,
+                  onTap: () {
+                    settings.setTradingUiMode(TradingUiMode.demo);
+                    Navigator.pop(sheetContext);
+                  },
+                ),
+                const SizedBox(height: 8),
+                _ModeTile(
+                  title: 'LIVE MODE',
+                  subtitle: 'Live-style interface',
+                  selected: settings.isLiveMode,
+                  onTap: () {
+                    settings.setTradingUiMode(TradingUiMode.live);
+                    Navigator.pop(sheetContext);
+                  },
+                ),
+                if (!settings.isLiveMode) ...[
+                  const SizedBox(height: 18),
+                  Text('Balance', style: Theme.of(sheetContext).textTheme.labelLarge),
+                  const SizedBox(height: 4),
+                  Text(
+                    AppUtils.formatMoney(trading.demoDisplayBalance),
+                    style: Theme.of(sheetContext).textTheme.headlineSmall,
+                  ),
+                  const SizedBox(height: 10),
+                  FilledButton.icon(
+                    onPressed: () {
+                      Navigator.pop(sheetContext);
+                      _openDeposit(context);
+                    },
+                    icon: const Icon(Icons.add, size: 18),
+                    label: const Text('Deposit'),
+                  ),
+                ],
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Future<void> _openDeposit(BuildContext context) async {
+    final trading = AppScope.trading(context);
+    await showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: context.tpColors.card,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(18)),
+      ),
+      builder: (sheetContext) {
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Text('Demo deposit', style: Theme.of(sheetContext).textTheme.titleMedium),
+                const SizedBox(height: 6),
+                Text(
+                  'Simulated demo funds only. Not a real payment.',
+                  style: Theme.of(sheetContext).textTheme.bodySmall,
+                ),
+                const SizedBox(height: 14),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [
+                    for (final amount in const [100.0, 500.0, 1000.0, 5000.0])
+                      OutlinedButton(
+                        onPressed: () {
+                          trading.addDemoFunds(amount);
+                          Navigator.pop(sheetContext);
+                        },
+                        child: Text('+${AppUtils.formatMoney(amount)}'),
+                      ),
+                  ],
+                ),
+                const SizedBox(height: 10),
+                FilledButton(
+                  onPressed: () {
+                    trading.restoreDemoFunds();
+                    Navigator.pop(sheetContext);
+                  },
+                  child: const Text('Restore \$10,000.00'),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+}
+
+class _ModeTile extends StatelessWidget {
+  const _ModeTile({
+    required this.title,
+    required this.subtitle,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final String title;
+  final String subtitle;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.tpColors;
+    return Pressable(
+      onPressed: onTap,
+      child: Container(
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: selected
+              ? colors.accent.withValues(alpha: 0.12)
+              : colors.canvasAlt.withValues(alpha: 0.5),
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(
+            color: selected ? colors.accent : colors.cardBorder,
+          ),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(title, style: const TextStyle(fontWeight: FontWeight.w800)),
+            const SizedBox(height: 2),
+            Text(subtitle, style: TextStyle(fontSize: 12, color: colors.mutedText)),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _SentimentBar extends StatelessWidget {
+  const _SentimentBar({required this.signal});
+
+  final TradeSignal signal;
+
+  @override
+  Widget build(BuildContext context) {
+    if (!signal.isDirectional || signal.confidence <= 0) {
+      return const SizedBox.shrink();
+    }
+    final colors = context.tpColors;
+    final strength = (signal.confidence * 100).round().clamp(0, 100);
+    final buyPct = signal.direction == 'BUY' ? strength : 100 - strength;
+    final sellPct = 100 - buyPct;
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+      child: Column(
+        children: [
+          Row(
+            children: [
               Text(
-                reconnecting
-                    ? 'RECONNECTING'
-                    : '$utcStamp  ·  Confidence: ${(signal.confidence * 100).round()}%',
-                style: TextStyle(fontSize: 11, color: colors.mutedText),
+                'BUY $buyPct%',
+                style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w700,
+                  color: colors.success,
+                ),
+              ),
+              const Spacer(),
+              Text(
+                'SELL $sellPct%',
+                style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w700,
+                  color: colors.danger,
+                ),
               ),
             ],
           ),
-        ),
+          const SizedBox(height: 4),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(99),
+            child: SizedBox(
+              height: 6,
+              child: Row(
+                children: [
+                  Expanded(
+                    flex: buyPct.clamp(1, 99),
+                    child: ColoredBox(color: colors.success),
+                  ),
+                  Expanded(
+                    flex: sellPct.clamp(1, 99),
+                    child: ColoredBox(color: colors.danger),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -305,12 +635,12 @@ class _ManualTradePanelState extends State<_ManualTradePanel> {
     final controller = widget.trading;
     return DecoratedBox(
       decoration: BoxDecoration(
-        color: colors.card.withValues(alpha: 0.94),
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(22)),
+        color: colors.card.withValues(alpha: 0.96),
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(18)),
         border: Border(top: BorderSide(color: colors.cardBorder.withValues(alpha: 0.7))),
       ),
       child: Padding(
-        padding: const EdgeInsets.fromLTRB(16, 12, 16, 14),
+        padding: const EdgeInsets.fromLTRB(16, 10, 16, 12),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -363,40 +693,40 @@ class _ManualTradePanelState extends State<_ManualTradePanel> {
               children: [
                 Expanded(
                   child: FilledButton(
-                    style: FilledButton.styleFrom(
-                      backgroundColor: colors.success,
-                      foregroundColor: onEmphasis,
-                      minimumSize: const Size.fromHeight(54),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      style: FilledButton.styleFrom(
+                        backgroundColor: colors.success,
+                        foregroundColor: onEmphasis,
+                        minimumSize: const Size.fromHeight(56),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      ),
+                      onPressed: widget.canTrade ? widget.onBuy : null,
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Text('BUY', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800)),
+                          Text('${widget.payoutPct}%', style: const TextStyle(fontSize: 12)),
+                        ],
+                      ),
                     ),
-                    onPressed: widget.canTrade ? widget.onBuy : null,
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        const Text('BUY', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800)),
-                        Text('${widget.payoutPct}%', style: const TextStyle(fontSize: 12)),
-                      ],
-                    ),
-                  ),
                 ),
                 const SizedBox(width: 10),
                 Expanded(
                   child: FilledButton(
-                    style: FilledButton.styleFrom(
-                      backgroundColor: colors.danger,
-                      foregroundColor: onEmphasis,
-                      minimumSize: const Size.fromHeight(54),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      style: FilledButton.styleFrom(
+                        backgroundColor: colors.danger,
+                        foregroundColor: onEmphasis,
+                        minimumSize: const Size.fromHeight(56),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      ),
+                      onPressed: widget.canTrade ? widget.onSell : null,
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Text('SELL', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800)),
+                          Text('${widget.payoutPct}%', style: const TextStyle(fontSize: 12)),
+                        ],
+                      ),
                     ),
-                    onPressed: widget.canTrade ? widget.onSell : null,
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        const Text('SELL', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800)),
-                        Text('${widget.payoutPct}%', style: const TextStyle(fontSize: 12)),
-                      ],
-                    ),
-                  ),
                 ),
               ],
             ),
@@ -593,7 +923,7 @@ class _LifecycleStrip extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'ACTIVE DEMO TRADE',
+                  'Active trade',
                   style: Theme.of(context).textTheme.labelLarge,
                 ),
                 const SizedBox(height: 6),
@@ -641,4 +971,3 @@ class _LifecycleStrip extends StatelessWidget {
     );
   }
 }
-

@@ -12,6 +12,7 @@ class TradingController extends ChangeNotifier {
   final TradingService _service;
   String? userId;
   double balance = 10000;
+  double sessionDemoCredit = 0;
   double stake = 10;
   int expirySeconds = 60;
   bool submitting = false;
@@ -46,9 +47,23 @@ class TradingController extends ChangeNotifier {
   List<TradeSignal> activeSignalsFor(String asset) =>
       signalsFor(asset).where((item) => item.isOpen).toList();
 
+  double get demoDisplayBalance => balance + sessionDemoCredit;
+
   bool canOpenTrade(String asset) =>
       !submitting &&
       activeTradesFor(asset).length < AppConstants.maxActiveSignalsPerAsset;
+
+  void addDemoFunds(double amount) {
+    if (amount <= 0) return;
+    sessionDemoCredit += amount;
+    notifyListeners();
+  }
+
+  void restoreDemoFunds() {
+    final needed = 10000 - demoDisplayBalance;
+    if (needed > 0) sessionDemoCredit += needed;
+    notifyListeners();
+  }
 
   Future<void> bindUser(String? identity) async {
     userId = identity;
@@ -77,7 +92,7 @@ class TradingController extends ChangeNotifier {
       error = null;
       notifyListeners();
     } catch (_) {
-      error = 'Demo ledger unreachable';
+      error = 'Trading account unreachable';
       notifyListeners();
     }
   }
@@ -118,7 +133,7 @@ class TradingController extends ChangeNotifier {
   }) async {
     final id = userId;
     if (id == null) {
-      error = 'Sign in to place a demo trade';
+      error = 'Sign in to place a trade';
       notifyListeners();
       return;
     }
@@ -129,7 +144,7 @@ class TradingController extends ChangeNotifier {
       return;
     }
     if (activeTradesFor(asset).length >= AppConstants.maxActiveSignalsPerAsset) {
-      error = 'Maximum 10 active demo trades for this asset';
+      error = 'Maximum 10 active trades for this asset';
       notifyListeners();
       return;
     }

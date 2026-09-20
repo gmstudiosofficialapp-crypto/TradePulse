@@ -45,7 +45,7 @@ class AppShell extends StatelessWidget {
                   const MarketStatusBanner(),
                   Expanded(
                     child: AnimatedSwitcher(
-                      duration: const Duration(milliseconds: 280),
+                      duration: const Duration(milliseconds: 320),
                       child: KeyedSubtree(
                         key: ValueKey(currentRoute),
                         child: child,

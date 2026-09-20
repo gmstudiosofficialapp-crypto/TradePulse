@@ -226,7 +226,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                 const SizedBox(height: 10),
                 PremiumCard(
                   child: Text(
-                    'Password, theme, and notifications stay in Settings. DEMO account only.',
+                    'Password, theme, and notifications stay in Settings.',
                     style: TextStyle(color: colors.mutedText),
                   ),
                 ),

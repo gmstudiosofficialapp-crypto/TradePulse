@@ -10,6 +10,7 @@ import '../../widgets/feedback/error_state.dart';
 import '../../widgets/forms/app_text_field.dart';
 import '../../widgets/forms/password_field.dart';
 import '../../widgets/layout/auth_screen_frame.dart';
+import '../../widgets/layout/entrance.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -57,21 +58,27 @@ class _LoginScreenState extends State<LoginScreen> {
         key: _formKey,
         child: Column(
           children: [
-            const TradePulseLogo(),
+            const Entrance(child: TradePulseLogo()),
             const SizedBox(height: 24),
-            AppTextField(
-              label: 'Email',
-              controller: _email,
-              keyboardType: TextInputType.emailAddress,
-              validator: Validators.email,
-              autofillHints: const [AutofillHints.email],
+            Entrance(
+              delay: const Duration(milliseconds: 90),
+              child: AppTextField(
+                label: 'Email',
+                controller: _email,
+                keyboardType: TextInputType.emailAddress,
+                validator: Validators.email,
+                autofillHints: const [AutofillHints.email],
+              ),
             ),
             const SizedBox(height: 12),
-            PasswordField(
-              label: 'Password',
-              controller: _password,
-              validator: Validators.password,
-              onSubmitted: (_) => _submit(),
+            Entrance(
+              delay: const Duration(milliseconds: 140),
+              child: PasswordField(
+                label: 'Password',
+                controller: _password,
+                validator: Validators.password,
+                onSubmitted: (_) => _submit(),
+              ),
             ),
             Align(
               alignment: Alignment.centerRight,
@@ -96,7 +103,7 @@ class _LoginScreenState extends State<LoginScreen> {
               onPressed: () {
                 Navigator.of(context).pushNamed(AppRoutes.signup);
               },
-              child: const Text('Create a demo account'),
+              child: const Text('Create an account'),
             ),
           ],
         ),

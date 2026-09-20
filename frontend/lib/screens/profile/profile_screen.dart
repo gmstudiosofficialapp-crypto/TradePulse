@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 
-import '../../core/constants/app_constants.dart';
 import '../../core/routes/app_routes.dart';
 import '../../core/services/app_scope.dart';
 import '../../core/theme/app_colors.dart';
@@ -59,7 +58,7 @@ class ProfileScreen extends StatelessWidget {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          user?.fullName ?? 'Demo trader',
+                          user?.fullName ?? 'Trader',
                           style: Theme.of(context).textTheme.headlineSmall,
                         ),
                         if ((user?.username ?? '').isNotEmpty)
@@ -72,10 +71,11 @@ class ProfileScreen extends StatelessWidget {
                           children: [
                             Chip(
                               label: Text(
-                                user?.accountType ?? AppConstants.accountType,
+                                AppScope.settings(context).isLiveMode
+                                    ? 'LIVE'
+                                    : 'DEMO',
                               ),
                             ),
-                            const Chip(label: Text('SIMULATED OTC')),
                             Chip(
                               label: Text(
                                 'Member since ${user == null ? '—' : AppUtils.formatMemberSince(user.memberSince)}',
@@ -130,7 +130,7 @@ class ProfileScreen extends StatelessWidget {
             const SizedBox(height: 10),
             PremiumCard(
               child: Text(
-                'DEMO account. ${AppConstants.demoOnlyNotice}',
+                'Manage personal details, security, and preferences.',
                 style: TextStyle(color: colors.mutedText),
               ),
             ),

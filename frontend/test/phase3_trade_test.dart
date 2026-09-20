@@ -79,6 +79,7 @@ Widget _harness({
   required Widget child,
   TradingController? trading,
   MarketController? market,
+  SettingsController? settings,
   Size size = const Size(1280, 1600),
 }) {
   final providedMarket = market != null;
@@ -122,7 +123,7 @@ Widget _harness({
       child: AuthScope(
         auth: AuthController(LocalAuthService()),
         child: SettingsScope(
-          settings: SettingsController(),
+          settings: settings ?? SettingsController(),
           child: MarketScope(
             market: marketCtrl,
             child: TradingScope(
@@ -141,7 +142,8 @@ void main() {
     await tester.pumpWidget(_harness(child: const TradeScreen()));
     await tester.pump();
     expect(find.textContaining('BUY'), findsWidgets);
-    expect(find.textContaining('Confidence: 91%'), findsOneWidget);
+    expect(find.textContaining('BUY 91%'), findsOneWidget);
+    expect(find.textContaining('Confidence:'), findsNothing);
   });
 
   testWidgets('BUY and SELL controls', (tester) async {
@@ -175,7 +177,7 @@ void main() {
     );
     await tester.pumpWidget(_harness(child: const TradeScreen(), trading: trading));
     await tester.pump();
-    expect(find.textContaining('ACTIVE DEMO TRADE', skipOffstage: false), findsOneWidget);
+    expect(find.textContaining('Active trade', skipOffstage: false), findsOneWidget);
     expect(find.textContaining('Direction: BUY'), findsOneWidget);
   });
 
@@ -229,7 +231,7 @@ void main() {
     expect(find.textContaining('ETH/USD-OTC'), findsOneWidget);
     expect(find.textContaining('WIN'), findsWidgets);
     expect(find.text('ALL'), findsOneWidget);
-    expect(find.text('Your completed DEMO trades will appear here.'), findsNothing);
+    expect(find.text('Your completed trades will appear here.'), findsNothing);
   });
 
   testWidgets('history filters', (tester) async {
@@ -325,12 +327,10 @@ void main() {
     expect(find.text('15m'), findsOneWidget);
   });
 
-  testWidgets('chart zoom controls do not place trades', (tester) async {
+  testWidgets('chart interaction does not place trades', (tester) async {
     final service = _FakeTrading();
     final trading = TradingController(service)..userId = 'ada@example.com';
     await tester.pumpWidget(_harness(child: const TradeScreen(), trading: trading));
-    await tester.pump();
-    await tester.tap(find.byTooltip('Zoom in'));
     await tester.pump();
     await tester.tap(find.byType(CandlestickChart));
     await tester.pump();
@@ -394,5 +394,20 @@ void main() {
     await tester.pump(const Duration(milliseconds: 50));
     expect(opened, 'EUR/USD-OTC');
     expect(market.focusedAsset, 'EUR/USD-OTC');
+  });
+
+  testWidgets('live mode buy does not open a trade', (tester) async {
+    final service = _FakeTrading();
+    final trading = TradingController(service)..userId = 'ada@example.com';
+    final settings = SettingsController()..setTradingUiMode(TradingUiMode.live);
+    await tester.pumpWidget(
+      _harness(child: const TradeScreen(), trading: trading, settings: settings),
+    );
+    await tester.pump();
+    await tester.tap(find.text('BUY').first);
+    await tester.pump();
+    expect(find.text('Insufficient Balance'), findsOneWidget);
+    expect(service.lastAsset, isNull);
+    expect(trading.activeTrades, isEmpty);
   });
 }

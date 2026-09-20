@@ -1,13 +1,12 @@
 import 'package:flutter/material.dart';
 
-import '../../core/constants/app_constants.dart';
 import '../../core/constants/otc_assets.dart';
 import '../../core/routes/app_routes.dart';
-import '../../core/utils/breakpoints.dart';
+import '../../core/services/app_scope.dart';
 import '../../widgets/brand/trade_pulse_logo.dart';
-import '../../widgets/buttons/secondary_button.dart';
-import '../../widgets/cards/asset_grid.dart';
 import '../../widgets/cards/demo_balance_card.dart';
+import '../../widgets/cards/asset_grid.dart';
+import '../../widgets/cards/quick_action_card.dart';
 import '../../widgets/feedback/empty_state.dart';
 import '../../widgets/layout/entrance.dart';
 import '../../widgets/layout/responsive_body.dart';
@@ -18,12 +17,12 @@ class HomeScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final compact = Breakpoints.isCompact(context);
+    final live = AppScope.settings(context).isLiveMode;
 
     return Scaffold(
       backgroundColor: Colors.transparent,
       appBar: AppBar(
-        title: Text(AppConstants.appName),
+        title: const Text('Home'),
         automaticallyImplyLeading: false,
       ),
       body: ResponsiveBody(
@@ -44,48 +43,64 @@ class HomeScreen extends StatelessWidget {
             const SizedBox(height: 24),
             const SectionHeader(
               title: 'Quick actions',
-              subtitle: 'Open the simulated OTC workspace',
+              subtitle: 'Jump into the workspace',
             ),
             const SizedBox(height: 12),
             LayoutBuilder(
               builder: (context, constraints) {
-                final buttonWidth =
-                    compact ? constraints.maxWidth : 180.0;
+                final gap = 12.0;
+                final width = (constraints.maxWidth - gap * 2) / 3;
+                final cardWidth = width < 96 ? constraints.maxWidth : width;
                 return Wrap(
-                  spacing: 12,
-                  runSpacing: 12,
+                  spacing: gap,
+                  runSpacing: gap,
                   children: [
                     SizedBox(
-                      width: buttonWidth,
-                      child: SecondaryButton(
-                        label: 'Trade',
-                        onPressed: () {
-                          Navigator.of(context).pushReplacementNamed(
-                            AppRoutes.trade,
-                          );
-                        },
+                      width: cardWidth,
+                      height: 118,
+                      child: Entrance(
+                        delay: const Duration(milliseconds: 80),
+                        child: QuickActionCard(
+                          title: 'TRADE',
+                          icon: Icons.candlestick_chart_outlined,
+                          onPressed: () {
+                            Navigator.of(context).pushReplacementNamed(
+                              AppRoutes.trade,
+                            );
+                          },
+                        ),
                       ),
                     ),
                     SizedBox(
-                      width: buttonWidth,
-                      child: SecondaryButton(
-                        label: 'Markets',
-                        onPressed: () {
-                          Navigator.of(context).pushReplacementNamed(
-                            AppRoutes.markets,
-                          );
-                        },
+                      width: cardWidth,
+                      height: 118,
+                      child: Entrance(
+                        delay: const Duration(milliseconds: 120),
+                        child: QuickActionCard(
+                          title: 'MARKETS',
+                          icon: Icons.grid_view_rounded,
+                          onPressed: () {
+                            Navigator.of(context).pushReplacementNamed(
+                              AppRoutes.markets,
+                            );
+                          },
+                        ),
                       ),
                     ),
                     SizedBox(
-                      width: buttonWidth,
-                      child: SecondaryButton(
-                        label: 'History',
-                        onPressed: () {
-                          Navigator.of(context).pushReplacementNamed(
-                            AppRoutes.history,
-                          );
-                        },
+                      width: cardWidth,
+                      height: 118,
+                      child: Entrance(
+                        delay: const Duration(milliseconds: 160),
+                        child: QuickActionCard(
+                          title: 'HISTORY',
+                          icon: Icons.history,
+                          onPressed: () {
+                            Navigator.of(context).pushReplacementNamed(
+                              AppRoutes.history,
+                            );
+                          },
+                        ),
                       ),
                     ),
                   ],
@@ -95,16 +110,21 @@ class HomeScreen extends StatelessWidget {
             const SizedBox(height: 24),
             const SectionHeader(
               title: 'Market overview',
-              subtitle: 'Simulated OTC overview until you open Markets or Trade',
+              subtitle: 'Open Markets or Trade for the full board',
             ),
             const SizedBox(height: 12),
-            const AssetGrid(assets: OtcAssets.popular),
+            const Entrance(
+              delay: Duration(milliseconds: 180),
+              child: AssetGrid(assets: OtcAssets.popular),
+            ),
             const SizedBox(height: 24),
             const SectionHeader(title: 'Recent activity'),
             const SizedBox(height: 12),
-            const EmptyState(
-              title: 'No demo trades yet',
-              message: 'Activity appears after you place a demo trade.',
+            EmptyState(
+              title: 'No trades yet',
+              message: live
+                  ? 'Completed trades will appear here.'
+                  : 'Activity appears after you place a trade.',
               icon: Icons.receipt_long_outlined,
             ),
           ],

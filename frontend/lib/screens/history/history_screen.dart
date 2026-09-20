@@ -6,6 +6,7 @@ import '../../core/utils/app_utils.dart';
 import '../../widgets/brand/asset_icon.dart';
 import '../../widgets/cards/premium_card.dart';
 import '../../widgets/feedback/empty_state.dart';
+import '../../widgets/layout/entrance.dart';
 import '../../widgets/layout/responsive_body.dart';
 
 class HistoryScreen extends StatefulWidget {
@@ -41,12 +42,12 @@ class _HistoryScreenState extends State<HistoryScreen> {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               Text(
-                'Your DEMO trading activity',
+                'Trade history',
                 style: Theme.of(context).textTheme.titleMedium,
               ),
               const SizedBox(height: 4),
               Text(
-                'SIMULATED OTC  ·  DEMO  ·  NO LIVE-MONEY TRADING',
+                'Closed positions on this account',
                 style: Theme.of(context).textTheme.bodySmall?.copyWith(
                       color: colors.mutedText,
                     ),
@@ -82,13 +83,15 @@ class _HistoryScreenState extends State<HistoryScreen> {
               const SizedBox(height: 16),
               if (trades.isEmpty)
                 const EmptyState(
-                  title: 'No demo trades yet',
-                  message: 'Your completed DEMO trades will appear here.',
+                  title: 'No trades yet',
+                  message: 'Your completed trades will appear here.',
                   icon: Icons.history,
                 )
               else
-                for (final trade in trades)
-                  Padding(
+                for (final entry in trades.asMap().entries)
+                  Entrance(
+                    delay: Duration(milliseconds: 40 * entry.key.clamp(0, 8)),
+                    child: Padding(
                     padding: const EdgeInsets.only(bottom: 8),
                     child: PremiumCard(
                       padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
@@ -97,18 +100,18 @@ class _HistoryScreenState extends State<HistoryScreen> {
                         children: [
                           Row(
                             children: [
-                              AssetIcon(symbol: trade.asset, size: 28),
+                              AssetIcon(symbol: entry.value.asset, size: 28),
                               const SizedBox(width: 8),
                               Expanded(
                                 child: Text(
-                                  trade.asset,
+                                  entry.value.asset,
                                   style: Theme.of(context).textTheme.titleSmall,
                                 ),
                               ),
                               Text(
-                                trade.direction,
+                                entry.value.direction,
                                 style: TextStyle(
-                                  color: trade.direction == 'BUY'
+                                  color: entry.value.direction == 'BUY'
                                       ? colors.success
                                       : colors.danger,
                                   fontWeight: FontWeight.w700,
@@ -116,9 +119,9 @@ class _HistoryScreenState extends State<HistoryScreen> {
                               ),
                               const SizedBox(width: 10),
                               Text(
-                                trade.result ?? trade.status,
+                                entry.value.result ?? entry.value.status,
                                 style: TextStyle(
-                                  color: _resultColor(colors, trade.result),
+                                  color: _resultColor(colors, entry.value.result),
                                   fontWeight: FontWeight.w700,
                                 ),
                               ),
@@ -131,24 +134,25 @@ class _HistoryScreenState extends State<HistoryScreen> {
                             children: [
                               _Meta(
                                 'Entry',
-                                '${AppUtils.formatPrice(trade.entryPrice)} → ${trade.expiryPrice == null ? 'pending' : AppUtils.formatPrice(trade.expiryPrice!)}',
+                                '${AppUtils.formatPrice(entry.value.entryPrice)} → ${entry.value.expiryPrice == null ? 'pending' : AppUtils.formatPrice(entry.value.expiryPrice!)}',
                               ),
-                              _Meta('Stake', AppUtils.formatMoney(trade.stake)),
+                              _Meta('Stake', AppUtils.formatMoney(entry.value.stake)),
                               _Meta(
                                 'Duration',
-                                AppUtils.formatExpiryLabel(trade.durationSeconds),
+                                AppUtils.formatExpiryLabel(entry.value.durationSeconds),
                               ),
                               _Meta(
                                 'P/L',
-                                AppUtils.formatSignedMoney(trade.profitLoss),
+                                AppUtils.formatSignedMoney(entry.value.profitLoss),
                               ),
-                              _Meta('Opened', AppUtils.formatStamp(trade.entryTime)),
-                              _Meta('Expiry', AppUtils.formatStamp(trade.expiryTime)),
+                              _Meta('Opened', AppUtils.formatStamp(entry.value.entryTime)),
+                              _Meta('Expiry', AppUtils.formatStamp(entry.value.expiryTime)),
                             ],
                           ),
                         ],
                       ),
                     ),
+                  ),
                   ),
             ],
           ),

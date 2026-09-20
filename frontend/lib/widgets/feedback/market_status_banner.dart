@@ -20,8 +20,8 @@ class MarketStatusBanner extends StatelessWidget {
       color: colors.sidebar.withValues(alpha: 0.92),
       child: Text(
         live
-            ? '${AppConstants.liveSimulation}  ·  ${AppConstants.simulatedOtc}  ·  not live-money trading'
-            : '${AppConstants.marketEngineOffline}  ·  ${AppConstants.simulatedOtc}',
+            ? AppConstants.liveSimulation
+            : AppConstants.marketEngineOffline,
         style: Theme.of(context).textTheme.labelMedium?.copyWith(
               color: live ? colors.accent : colors.mutedText,
             ),

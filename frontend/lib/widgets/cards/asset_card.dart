@@ -111,14 +111,14 @@ class AssetCard extends StatelessWidget {
           Text(
             quote == null
                 ? AppConstants.simulatedOtc
-                : '${AppUtils.formatChange(quote.changePct)}  ·  ${AppConstants.simulatedOtc}',
+                : AppUtils.formatChange(quote.changePct),
             style: Theme.of(context).textTheme.bodySmall?.copyWith(
                   color: quote == null ? colors.mutedText : changeColor,
                 ),
           ),
           const SizedBox(height: 8),
           Text(
-            live ? 'LIVE SIMULATION' : AppConstants.marketEngineOffline,
+            live ? 'LIVE' : AppConstants.marketEngineOffline,
             style: Theme.of(context).textTheme.labelSmall?.copyWith(
                   color: live ? colors.accent : colors.mutedText,
                 ),

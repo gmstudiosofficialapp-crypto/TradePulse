@@ -10,6 +10,7 @@ import '../../widgets/feedback/error_state.dart';
 import '../../widgets/forms/app_text_field.dart';
 import '../../widgets/forms/password_field.dart';
 import '../../widgets/layout/auth_screen_frame.dart';
+import '../../widgets/layout/entrance.dart';
 
 class SignupScreen extends StatefulWidget {
   const SignupScreen({super.key});
@@ -66,7 +67,9 @@ class _SignupScreenState extends State<SignupScreen> {
         key: _formKey,
         child: Column(
           children: [
-            const TradePulseLogo(compact: true, showTagline: false),
+            const Entrance(
+              child: TradePulseLogo(compact: true, showTagline: false),
+            ),
             const SizedBox(height: 16),
             AppTextField(
               label: 'Full Name',

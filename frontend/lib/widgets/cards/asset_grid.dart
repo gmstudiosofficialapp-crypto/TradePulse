@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../models/otc_asset.dart';
+import '../layout/entrance.dart';
 import 'asset_card.dart';
 
 class AssetGrid extends StatelessWidget {
@@ -25,10 +26,13 @@ class AssetGrid extends StatelessWidget {
           spacing: 12,
           runSpacing: 12,
           children: [
-            for (final asset in assets)
+            for (final entry in assets.asMap().entries)
               SizedBox(
                 width: itemWidth,
-                child: AssetCard(asset: asset),
+                child: Entrance(
+                  delay: Duration(milliseconds: 40 * entry.key.clamp(0, 10)),
+                  child: AssetCard(asset: entry.value),
+                ),
               ),
           ],
         );
