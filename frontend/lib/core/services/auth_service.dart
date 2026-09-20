@@ -25,6 +25,13 @@ abstract class AuthService {
 
   Future<void> resetPassword({required String email});
 
+  Future<String> verifyResetActionCode(String oobCode);
+
+  Future<void> confirmPasswordReset({
+    required String oobCode,
+    required String newPassword,
+  });
+
   Future<UserProfile> updateProfile({
     required String fullName,
     String? username,

@@ -46,6 +46,22 @@ class TradingService {
     return (body['balance'] as num).toDouble();
   }
 
+  Future<double> creditDemo(double amount) async {
+    final response = await http.post(
+      Uri.parse('$httpBase/api/demo/credit'),
+      headers: await _headers(),
+      body: jsonEncode({'amount': amount}),
+    );
+    if (response.statusCode == 401) {
+      throw Exception('Session expired. Sign in again.');
+    }
+    if (response.statusCode != 200) {
+      throw Exception('Unable to add demo balance');
+    }
+    final body = jsonDecode(response.body) as Map<String, dynamic>;
+    return (body['balance'] as num).toDouble();
+  }
+
   Future<DemoStatistics> getStatistics(String userId) async {
     final response = await http.get(
       Uri.parse('$httpBase/api/demo/statistics'),

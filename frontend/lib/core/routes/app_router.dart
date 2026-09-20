@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../screens/auth/forgot_password_screen.dart';
 import '../../screens/auth/login_screen.dart';
+import '../../screens/auth/reset_password_screen.dart';
 import '../../screens/auth/signup_screen.dart';
 import '../../screens/history/history_screen.dart';
 import '../../screens/home/home_screen.dart';
@@ -12,6 +13,11 @@ import '../../screens/profile/profile_screen.dart';
 import '../../screens/settings/settings_screen.dart';
 import '../../screens/splash_screen.dart';
 import '../../screens/trade/trade_screen.dart';
+import '../../screens/wallet/live_deposit_confirm_screen.dart';
+import '../../screens/wallet/live_deposit_screen.dart';
+import '../../screens/wallet/live_transfers_screen.dart';
+import '../../screens/wallet/live_withdraw_screen.dart';
+import '../../models/live_wallet_models.dart';
 import '../../widgets/navigation/app_shell.dart';
 import '../services/auth_controller.dart';
 import 'app_routes.dart';
@@ -58,6 +64,9 @@ class AppRouter {
       AppRoutes.login => const LoginScreen(),
       AppRoutes.signup => const SignupScreen(),
       AppRoutes.forgotPassword => const ForgotPasswordScreen(),
+      AppRoutes.resetPassword => ResetPasswordScreen(
+          oobCode: arguments is String ? arguments : null,
+        ),
       AppRoutes.home => const HomeScreen(),
       AppRoutes.markets => const MarketsScreen(),
       AppRoutes.trade => TradeScreen(initialAsset: tradeAsset),
@@ -66,6 +75,12 @@ class AppRouter {
       AppRoutes.settings => const SettingsScreen(),
       AppRoutes.editProfile => const EditProfileScreen(),
       AppRoutes.changePassword => const ChangePasswordScreen(),
+      AppRoutes.liveDeposit => const LiveDepositScreen(),
+      AppRoutes.liveDepositConfirm => arguments is LiveDepositDraft
+          ? LiveDepositConfirmScreen(draft: arguments)
+          : const LiveDepositScreen(),
+      AppRoutes.liveWithdraw => const LiveWithdrawScreen(),
+      AppRoutes.liveTransfers => const LiveTransfersScreen(),
       _ => const LoginScreen(),
     };
 

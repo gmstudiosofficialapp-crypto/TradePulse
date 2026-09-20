@@ -41,6 +41,20 @@ class AuthController extends ChangeNotifier {
     return _service.resetPassword(email: email);
   }
 
+  Future<String> verifyResetActionCode(String oobCode) {
+    return _service.verifyResetActionCode(oobCode);
+  }
+
+  Future<void> confirmPasswordReset({
+    required String oobCode,
+    required String newPassword,
+  }) {
+    return _service.confirmPasswordReset(
+      oobCode: oobCode,
+      newPassword: newPassword,
+    );
+  }
+
   Future<void> updateProfile({
     required String fullName,
     String? username,

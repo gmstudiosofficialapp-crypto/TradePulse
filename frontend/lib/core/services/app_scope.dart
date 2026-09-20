@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import 'auth_controller.dart';
+import 'live_wallet_controller.dart';
 import 'market_controller.dart';
 import 'settings_controller.dart';
 import 'trading_controller.dart';
@@ -69,6 +70,24 @@ class TradingScope extends InheritedNotifier<TradingController> {
   }
 }
 
+class LiveWalletScope extends InheritedNotifier<LiveWalletController> {
+  const LiveWalletScope({
+    super.key,
+    required LiveWalletController wallet,
+    required super.child,
+  }) : super(notifier: wallet);
+
+  static LiveWalletController of(BuildContext context) {
+    final scope = context.dependOnInheritedWidgetOfExactType<LiveWalletScope>();
+    assert(scope != null, 'LiveWalletScope not found');
+    return scope!.notifier!;
+  }
+
+  static LiveWalletController? maybeOf(BuildContext context) {
+    return context.dependOnInheritedWidgetOfExactType<LiveWalletScope>()?.notifier;
+  }
+}
+
 class AppScope {
   static AuthController auth(BuildContext context) => AuthScope.of(context);
 
@@ -80,4 +99,7 @@ class AppScope {
 
   static TradingController trading(BuildContext context) =>
       TradingScope.of(context);
+
+  static LiveWalletController wallet(BuildContext context) =>
+      LiveWalletScope.of(context);
 }

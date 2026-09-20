@@ -47,6 +47,31 @@ class MarketCandle {
   final DateTime closeTime;
   final bool closed;
 
+  MarketCandle copyWith({
+    double? open,
+    double? high,
+    double? low,
+    double? close,
+    int? volume,
+    DateTime? closeTime,
+    bool? closed,
+  }) {
+    return MarketCandle(
+      asset: asset,
+      open: open ?? this.open,
+      high: high ?? this.high,
+      low: low ?? this.low,
+      close: close ?? this.close,
+      volume: volume ?? this.volume,
+      openTime: openTime,
+      closeTime: closeTime ?? this.closeTime,
+      closed: closed ?? this.closed,
+    );
+  }
+
+  int get minuteKey =>
+      openTime.toUtc().millisecondsSinceEpoch ~/ 60000;
+
   factory MarketCandle.fromJson(Map<String, dynamic> json) {
     return MarketCandle(
       asset: json['asset'] as String? ?? '',

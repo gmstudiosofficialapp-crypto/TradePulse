@@ -5,6 +5,7 @@ import 'package:http/http.dart' as http;
 
 import '../../models/user_profile.dart';
 import '../constants/app_constants.dart';
+import '../routes/app_routes.dart';
 import 'auth_service.dart';
 
 class FirebaseAuthService implements AuthService {
@@ -81,9 +82,39 @@ class FirebaseAuthService implements AuthService {
   @override
   Future<void> resetPassword({required String email}) async {
     try {
-      await _auth.sendPasswordResetEmail(email: email.trim());
+      await _auth.sendPasswordResetEmail(
+        email: email.trim(),
+        actionCodeSettings: ActionCodeSettings(
+          url: '${Uri.base.origin}/#${AppRoutes.resetPassword}',
+          handleCodeInApp: true,
+        ),
+      );
     } on FirebaseAuthException catch (error) {
-      throw AuthException(_message(error));
+      throw AuthException(_resetMessage(error));
+    }
+  }
+
+  @override
+  Future<String> verifyResetActionCode(String oobCode) async {
+    try {
+      return await _auth.verifyPasswordResetCode(oobCode);
+    } on FirebaseAuthException catch (error) {
+      throw AuthException(_resetMessage(error));
+    }
+  }
+
+  @override
+  Future<void> confirmPasswordReset({
+    required String oobCode,
+    required String newPassword,
+  }) async {
+    try {
+      await _auth.confirmPasswordReset(
+        code: oobCode,
+        newPassword: newPassword,
+      );
+    } on FirebaseAuthException catch (error) {
+      throw AuthException(_resetMessage(error));
     }
   }
 
@@ -215,8 +246,26 @@ class FirebaseAuthService implements AuthService {
       'weak-password' => 'Password is too weak',
       'requires-recent-login' => 'Current password is incorrect',
       'invalid-email' => 'Enter a valid email',
+      'expired-action-code' =>
+        'This reset link has expired. Request a new email.',
+      'invalid-action-code' =>
+        'This reset link is invalid or has already been used.',
       'network-request-failed' => 'Network failure. Try again.',
       _ => error.message ?? 'Authentication failed',
+    };
+  }
+
+  String _resetMessage(FirebaseAuthException error) {
+    return switch (error.code) {
+      'user-not-found' => 'No account found for that email',
+      'invalid-email' => 'Enter a valid email',
+      'expired-action-code' =>
+        'This reset link has expired. Request a new email.',
+      'invalid-action-code' =>
+        'This reset link is invalid or has already been used.',
+      'weak-password' => 'Password is too weak',
+      'network-request-failed' => 'Network failure. Try again.',
+      _ => error.message ?? 'Unable to reset password',
     };
   }
 }

@@ -1,5 +1,8 @@
+import 'dart:math' as math;
+
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/scheduler.dart';
 
 import '../../core/theme/app_colors.dart';
 import '../../core/utils/app_utils.dart';
@@ -16,6 +19,7 @@ class CandlestickChart extends StatefulWidget {
     this.height,
     this.immersive = false,
     this.overlayInsets = EdgeInsets.zero,
+    this.livePrice,
   });
 
   final List<MarketCandle> candles;
@@ -25,46 +29,142 @@ class CandlestickChart extends StatefulWidget {
   final double? height;
   final bool immersive;
   final EdgeInsets overlayInsets;
+  final double? livePrice;
 
   @override
   State<CandlestickChart> createState() => _CandlestickChartState();
 }
 
-class _CandlestickChartState extends State<CandlestickChart> {
+class _CandlestickChartState extends State<CandlestickChart>
+    with SingleTickerProviderStateMixin {
+  static const _minZoom = 0.55;
+  static const _maxZoom = 6.0;
+
   double _zoom = 1;
-  double _pan = 0;
   double _gestureZoom = 1;
+  double _rightOffset = 0;
+  var _following = true;
+  late final Ticker _ticker;
+  double _shownClose = 0;
+  double _shownHigh = 0;
+  double _shownLow = 0;
+  DateTime? _liveOpen;
+  Duration _lastElapsed = Duration.zero;
+
+  @override
+  void initState() {
+    super.initState();
+    _snapLive();
+    _ticker = createTicker(_tick)..start();
+  }
+
+  @override
+  void didUpdateWidget(covariant CandlestickChart oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    final last = widget.candles.isEmpty ? null : widget.candles.last;
+    if (last == null) return;
+    if (_liveOpen != last.openTime) {
+      _snapLive();
+    }
+  }
+
+  @override
+  void dispose() {
+    _ticker.dispose();
+    super.dispose();
+  }
+
+  void _snapLive() {
+    if (widget.candles.isEmpty) return;
+    final last = widget.candles.last;
+    _liveOpen = last.openTime;
+    _shownClose = last.close;
+    _shownHigh = last.high;
+    _shownLow = last.low;
+  }
+
+  void _tick(Duration elapsed) {
+    if (!mounted || widget.candles.isEmpty) return;
+    final last = widget.candles.last;
+    if (_liveOpen != last.openTime) {
+      _snapLive();
+    }
+    final dt = elapsed <= _lastElapsed
+        ? 1 / 60
+        : (elapsed - _lastElapsed).inMicroseconds / 1000000;
+    _lastElapsed = elapsed;
+    final targetClose = widget.livePrice ?? last.close;
+    if (last.closed) {
+      if (_shownClose != last.close ||
+          _shownHigh != last.high ||
+          _shownLow != last.low) {
+        setState(() {
+          _shownClose = last.close;
+          _shownHigh = last.high;
+          _shownLow = last.low;
+        });
+      }
+      return;
+    }
+    final alpha = (1 - math.exp(-dt / 0.22)).clamp(0.0, 1.0);
+    final nextClose = _shownClose + (targetClose - _shownClose) * alpha;
+    final nextHigh = math.max(math.max(last.high, last.open), nextClose);
+    final nextLow = math.min(math.min(last.low, last.open), nextClose);
+    if ((nextClose - _shownClose).abs() < 0.0000001 &&
+        (nextHigh - _shownHigh).abs() < 0.0000001 &&
+        (nextLow - _shownLow).abs() < 0.0000001) {
+      return;
+    }
+    setState(() {
+      _shownClose = nextClose;
+      _shownHigh = nextHigh;
+      _shownLow = nextLow;
+    });
+  }
 
   void _zoomBy(double factor) {
     setState(() {
-      _zoom = (_zoom * factor).clamp(1.0, 8.0);
-      _pan = _pan.clamp(0, _maxPan);
+      _zoom = (_zoom * factor).clamp(_minZoom, _maxZoom);
+      if (_following) _rightOffset = 0;
+      _rightOffset = _rightOffset.clamp(0, _maxOffset);
     });
   }
 
   void _reset() {
     setState(() {
       _zoom = 1;
-      _pan = 0;
+      _rightOffset = 0;
+      _following = true;
     });
   }
 
-  int get _visibleCount {
+  int _visibleCountFor(double width) {
     if (widget.candles.isEmpty) return 0;
-    final count = (widget.candles.length / _zoom).round();
-    return count.clamp(1, widget.candles.length);
+    final slot = (18.0 * _zoom).clamp(8.0, 44.0);
+    final count = (width / slot).floor();
+    return count.clamp(8, math.max(8, widget.candles.length));
   }
 
-  double get _maxPan {
-    final extra = widget.candles.length - _visibleCount;
+  double get _maxOffset {
+    final extra = widget.candles.length - 8;
     return extra < 0 ? 0 : extra.toDouble();
   }
 
-  List<MarketCandle> get _visible {
+  List<MarketCandle> _visible(double width) {
     if (widget.candles.isEmpty) return const [];
-    final start = (_maxPan - _pan).round().clamp(0, widget.candles.length);
-    final end = (start + _visibleCount).clamp(0, widget.candles.length);
-    return widget.candles.sublist(start, end);
+    final count = math.min(_visibleCountFor(width), widget.candles.length);
+    final offset = _following ? 0.0 : _rightOffset;
+    final end = widget.candles.length - offset.round();
+    final safeEnd = end.clamp(count, widget.candles.length);
+    final start = (safeEnd - count).clamp(0, widget.candles.length);
+    final slice = widget.candles.sublist(start, safeEnd);
+    if (slice.isEmpty) return slice;
+    final last = slice.last;
+    if (last.closed || last != widget.candles.last) return slice;
+    return [
+      ...slice.sublist(0, slice.length - 1),
+      last.copyWith(close: _shownClose, high: _shownHigh, low: _shownLow),
+    ];
   }
 
   @override
@@ -74,60 +174,58 @@ class _CandlestickChartState extends State<CandlestickChart> {
       borderRadius: BorderRadius.circular(widget.immersive ? 0 : 14),
       child: ColoredBox(
         color: colors.chart,
-        child: Column(
-          children: [
-            if (widget.height == null)
-              Expanded(child: _immersiveBody(colors))
-            else
-              SizedBox(
+        child: widget.height == null
+            ? _chartBody(colors)
+            : SizedBox(
                 height: widget.height,
                 width: double.infinity,
-                child: _immersiveBody(colors),
+                child: _chartBody(colors),
               ),
-          ],
-        ),
       ),
     );
-  }
-
-  Widget _immersiveBody(TradePulseColors colors) {
-    return _chartBody(colors);
   }
 
   Widget _chartBody(TradePulseColors colors) {
     if (widget.candles.isEmpty) {
       return Center(
         child: Text(
-          'Waiting for simulated candles…',
+          'Waiting for candles…',
           style: TextStyle(color: colors.mutedText),
         ),
       );
     }
-    return Listener(
-      onPointerSignal: (event) {
-        if (event is PointerScrollEvent) {
-          _zoomBy(event.scrollDelta.dy > 0 ? 1.12 : 1 / 1.12);
-        }
-      },
-      child: GestureDetector(
-        behavior: HitTestBehavior.opaque,
-        onDoubleTap: _reset,
-        onScaleStart: (_) => _gestureZoom = _zoom,
-        onScaleUpdate: (details) {
-          if (details.pointerCount >= 2 && details.scale != 1.0) {
-            setState(() {
-              _zoom = (_gestureZoom * details.scale).clamp(1.0, 8.0);
-              _pan = _pan.clamp(0, _maxPan);
-            });
-          } else {
-            setState(() {
-              _pan = (_pan - details.focalPointDelta.dx / 8).clamp(0, _maxPan);
-            });
-          }
-        },
-        child: CustomPaint(
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final width = constraints.maxWidth;
+        return Listener(
+          onPointerSignal: (event) {
+            if (event is PointerScrollEvent) {
+              _zoomBy(event.scrollDelta.dy > 0 ? 1 / 1.12 : 1.12);
+            }
+          },
+          child: GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            onDoubleTap: _reset,
+            onScaleStart: (_) => _gestureZoom = _zoom,
+            onScaleUpdate: (details) {
+              if (details.pointerCount >= 2) {
+                setState(() {
+                  _zoom = (_gestureZoom * details.scale).clamp(_minZoom, _maxZoom);
+                });
+                return;
+              }
+              final slot = (18.0 * _zoom).clamp(8.0, 44.0);
+              final delta = -details.focalPointDelta.dx / slot;
+              if (delta.abs() < 0.02) return;
+              setState(() {
+                _rightOffset = (_rightOffset + delta).clamp(0, _maxOffset);
+                _following = _rightOffset < 0.35;
+                if (_following) _rightOffset = 0;
+              });
+            },
+            child: CustomPaint(
               painter: _CandlePainter(
-                candles: _visible,
+                candles: _visible(width),
                 entries: {
                   for (final entry in widget.entries) entry.tradeId: entry,
                 }.values.toList(),
@@ -141,10 +239,14 @@ class _CandlestickChartState extends State<CandlestickChart> {
                 down: colors.danger,
                 text: colors.mutedText,
                 priceLine: colors.accent,
+                insets: widget.overlayInsets,
+                following: _following,
               ),
               child: const SizedBox.expand(),
             ),
-      ),
+          ),
+        );
+      },
     );
   }
 }
@@ -161,6 +263,8 @@ class _CandlePainter extends CustomPainter {
     required this.down,
     required this.text,
     required this.priceLine,
+    required this.insets,
+    required this.following,
   });
 
   final List<MarketCandle> candles;
@@ -173,15 +277,23 @@ class _CandlePainter extends CustomPainter {
   final Color down;
   final Color text;
   final Color priceLine;
+  final EdgeInsets insets;
+  final bool following;
 
   @override
   void paint(Canvas canvas, Size size) {
     if (candles.isEmpty) return;
     const right = 58.0;
     const bottom = 22.0;
-    const left = 8.0;
-    const top = 8.0;
-    final plot = Rect.fromLTRB(left, top, size.width - right, size.height - bottom);
+    const left = 10.0;
+    final top = 8.0 + insets.top;
+    final plot = Rect.fromLTRB(
+      left,
+      top,
+      size.width - right,
+      size.height - bottom - insets.bottom,
+    );
+    if (plot.height < 40 || plot.width < 40) return;
 
     var maxP = candles.first.high;
     var minP = candles.first.low;
@@ -190,20 +302,13 @@ class _CandlePainter extends CustomPainter {
       if (candle.low < minP) minP = candle.low;
     }
     for (final entry in entries) {
-      if (candleForEntry(candles, entry.entryTime) == null) continue;
       if (entry.entryPrice > maxP) maxP = entry.entryPrice;
       if (entry.entryPrice < minP) minP = entry.entryPrice;
     }
-    for (final item in spans) {
-      if (item.entryPrice > maxP) maxP = item.entryPrice;
-      if (item.entryPrice < minP) minP = item.entryPrice;
-      final close = item.closePrice;
-      if (close != null) {
-        if (close > maxP) maxP = close;
-        if (close < minP) minP = close;
-      }
-    }
-    final span = (maxP - minP).abs() < 0.0000001 ? 1.0 : maxP - minP;
+    final pad = (maxP - minP).abs() < 0.0000001 ? 1.0 : (maxP - minP) * 0.08;
+    maxP += pad;
+    minP -= pad;
+    final span = maxP - minP;
     final last = candles.last.close;
 
     final gridPaint = Paint()
@@ -222,26 +327,38 @@ class _CandlePainter extends CustomPainter {
     }
 
     final candleWidth = plot.width / candles.length;
+    final bodyHalf = (candleWidth * 0.32).clamp(2.2, 14.0);
+    final wickWidth = (candleWidth * 0.08).clamp(1.2, 2.4);
+
     for (var i = 0; i < candles.length; i++) {
       final candle = candles[i];
       final color = candle.close >= candle.open ? up : down;
       final x = plot.left + i * candleWidth + candleWidth / 2;
-      final wick = Paint()
-        ..color = color
-        ..strokeWidth = 1.2;
-      canvas.drawLine(Offset(x, yFor(candle.high)), Offset(x, yFor(candle.low)), wick);
-      final bodyTop = yFor(candle.open > candle.close ? candle.open : candle.close);
-      final bodyBottom = yFor(candle.open < candle.close ? candle.open : candle.close);
-      final half = candleWidth * 0.28;
+      final yHigh = yFor(candle.high);
+      final yLow = yFor(candle.low);
+      final yOpen = yFor(candle.open);
+      final yClose = yFor(candle.close);
+      final bodyTop = math.min(yOpen, yClose);
+      final bodyBottom = math.max(yOpen, yClose);
+      final minBody = math.max(3.0, bodyHalf * 0.7);
+      final height = math.max(minBody, bodyBottom - bodyTop);
+      final bodyCenterY = (yOpen + yClose) / 2;
+      final wickSpan = (yLow - yHigh).abs();
+      if (wickSpan > height + 1.0) {
+        final wick = Paint()
+          ..color = color
+          ..strokeWidth = wickWidth
+          ..strokeCap = StrokeCap.round;
+        canvas.drawLine(Offset(x, yHigh), Offset(x, yLow), wick);
+      }
       canvas.drawRRect(
         RRect.fromRectAndRadius(
-          Rect.fromLTRB(
-            x - half,
-            bodyTop,
-            x + half,
-            bodyBottom + 1,
+          Rect.fromCenter(
+            center: Offset(x, bodyCenterY),
+            width: bodyHalf * 2,
+            height: height,
           ),
-          const Radius.circular(1),
+          const Radius.circular(1.5),
         ),
         Paint()..color = color,
       );
@@ -250,13 +367,17 @@ class _CandlePainter extends CustomPainter {
     double? xAt(DateTime time) {
       final stamp = time.toUtc();
       if (stamp.isBefore(candles.first.openTime.toUtc())) return plot.left;
-      if (!stamp.isBefore(candles.last.closeTime.toUtc())) {
+      if (!stamp.isBefore(candles.last.closeTime.toUtc()) && candles.last.closed) {
         return plot.left + (candles.length - 0.5) * candleWidth;
       }
       for (var i = 0; i < candles.length; i++) {
         final candle = candles[i];
         final open = candle.openTime.toUtc();
-        final close = candle.closeTime.toUtc();
+        final close = candle.closed
+            ? candle.closeTime.toUtc()
+            : candle.closeTime.toUtc().isAfter(open.add(const Duration(minutes: 1)))
+                ? candle.closeTime.toUtc()
+                : open.add(const Duration(minutes: 1));
         if (stamp.isBefore(open)) {
           return plot.left + i * candleWidth;
         }
@@ -268,71 +389,58 @@ class _CandlePainter extends CustomPainter {
           return plot.left + i * candleWidth + frac.clamp(0, 1) * candleWidth;
         }
       }
-      return null;
+      return plot.left + (candles.length - 0.5) * candleWidth;
     }
 
     for (var index = 0; index < spans.length; index++) {
       final item = spans[index];
       final start = xAt(item.entryTime);
-      final endTime = item.isClosed
-          ? (item.closeTime ?? item.entryTime)
-          : now;
-      final end = xAt(endTime);
-      if (start == null || end == null) continue;
+      if (start == null) continue;
       final buy = item.direction == 'BUY';
-      final color = (buy ? up : down).withValues(alpha: 0.85);
-      final yStart = yFor(item.entryPrice) + ((index % 5) - 2) * 1.5;
-      final yEnd = yFor(item.closePrice ?? item.entryPrice) + ((index % 5) - 2) * 1.5;
-      final line = Paint()
+      final color = (buy ? up : down).withValues(alpha: 0.7);
+      final y = yFor(item.entryPrice);
+      final mark = Paint()
         ..color = color
-        ..strokeWidth = 1.6
+        ..strokeWidth = 1.4
         ..strokeCap = StrokeCap.round;
-      canvas.drawLine(Offset(start, yStart), Offset(end, yEnd), line);
-      canvas.drawLine(Offset(start, yStart - 4), Offset(start, yStart + 4), line);
-      _brokerFlag(canvas, Offset(start + 6, yStart), item.direction, color, buy);
+      canvas.drawLine(Offset(start - 5, y), Offset(start + 5, y), mark);
+      _tinyFlag(canvas, Offset(start + 6, y), item.direction, color, buy);
     }
 
     for (final entry in entries) {
-      final index = candles.indexWhere(
-        (candle) => candleContainsEntry(candle, entry.entryTime),
-      );
-      if (index < 0) continue;
-      final x = plot.left + index * candleWidth + candleWidth / 2;
+      final x = xAt(entry.entryTime);
+      if (x == null) continue;
       final y = yFor(entry.entryPrice);
       final buy = entry.direction == 'BUY';
       final color = buy ? up : down;
       final hot = highlightId == entry.tradeId;
       final dash = Paint()
-        ..color = color.withValues(alpha: hot ? 0.7 : 0.4)
-        ..strokeWidth = hot ? 1.4 : 1;
+        ..color = color.withValues(alpha: hot ? 0.75 : 0.45)
+        ..strokeWidth = hot ? 1.3 : 1.0;
       var dashX = x;
       while (dashX < plot.right) {
-        canvas.drawLine(Offset(dashX, y), Offset(dashX + 4, y), dash);
-        dashX += 8;
+        canvas.drawLine(Offset(dashX, y), Offset(dashX + 5, y), dash);
+        dashX += 9;
       }
-      final tick = Paint()
-        ..color = color
-        ..strokeWidth = 2.4
-        ..strokeCap = StrokeCap.square;
-      canvas.drawLine(Offset(x - 8, y), Offset(x + 8, y), tick);
-      _brokerFlag(canvas, Offset(x + 10, y), entry.direction, color, buy);
+      _tinyFlag(
+        canvas,
+        Offset(x + 4, y),
+        buy ? 'B' : 'S',
+        color,
+        buy,
+      );
     }
 
-    final lastY = yFor(last);
+    final lastY = yFor(last).clamp(plot.top + 8, plot.bottom - 8);
     final dash = Paint()
-      ..color = priceLine.withValues(alpha: 0.7)
+      ..color = priceLine.withValues(alpha: 0.75)
       ..strokeWidth = 1;
     var x = plot.left;
     while (x < plot.right) {
       canvas.drawLine(Offset(x, lastY), Offset(x + 4, lastY), dash);
       x += 8;
     }
-    _label(
-      canvas,
-      AppUtils.formatPrice(last),
-      Offset(plot.right + 6, lastY - 6),
-      TextStyle(color: priceLine, fontSize: 10, fontWeight: FontWeight.w700),
-    );
+    _priceTag(canvas, Offset(plot.right + 4, lastY), AppUtils.formatPrice(last), priceLine);
 
     final step = (candles.length / 4).ceil().clamp(1, candles.length);
     for (var i = 0; i < candles.length; i += step) {
@@ -344,7 +452,7 @@ class _CandlePainter extends CustomPainter {
     }
   }
 
-  void _brokerFlag(
+  void _tinyFlag(
     Canvas canvas,
     Offset point,
     String direction,
@@ -357,27 +465,40 @@ class _CandlePainter extends CustomPainter {
         style: const TextStyle(
           color: Colors.white,
           fontSize: 8,
-          fontWeight: FontWeight.w800,
-          letterSpacing: 0.3,
+          fontWeight: FontWeight.w700,
         ),
       ),
       textDirection: TextDirection.ltr,
     )..layout();
-    final w = painter.width + 10;
-    final h = 14.0;
-    final top = buy ? point.dy - h - 6 : point.dy + 6;
+    final w = painter.width + 8;
+    const h = 12.0;
+    final top = buy ? point.dy - h - 4 : point.dy + 4;
     final rect = RRect.fromRectAndRadius(
       Rect.fromLTWH(point.dx, top, w, h),
       const Radius.circular(3),
     );
+    canvas.drawRRect(rect, Paint()..color = color.withValues(alpha: 0.92));
+    painter.paint(canvas, Offset(point.dx + 4, top + 1));
+  }
+
+  void _priceTag(Canvas canvas, Offset offset, String value, Color color) {
+    final painter = TextPainter(
+      text: TextSpan(
+        text: value,
+        style: const TextStyle(
+          color: Colors.white,
+          fontSize: 10,
+          fontWeight: FontWeight.w700,
+        ),
+      ),
+      textDirection: TextDirection.ltr,
+    )..layout();
+    final rect = RRect.fromRectAndRadius(
+      Rect.fromLTWH(offset.dx, offset.dy - 8, painter.width + 8, 16),
+      const Radius.circular(3),
+    );
     canvas.drawRRect(rect, Paint()..color = color);
-    painter.paint(canvas, Offset(point.dx + 5, top + 2));
-    final notch = Path()
-      ..moveTo(point.dx + 6, buy ? top + h : top)
-      ..lineTo(point.dx + 11, point.dy)
-      ..lineTo(point.dx + 16, buy ? top + h : top)
-      ..close();
-    canvas.drawPath(notch, Paint()..color = color);
+    painter.paint(canvas, Offset(offset.dx + 4, offset.dy - 7));
   }
 
   void _label(Canvas canvas, String value, Offset offset, TextStyle style) {
@@ -389,5 +510,15 @@ class _CandlePainter extends CustomPainter {
   }
 
   @override
-  bool shouldRepaint(covariant _CandlePainter oldDelegate) => true;
+  bool shouldRepaint(covariant _CandlePainter oldDelegate) {
+    return oldDelegate.candles.length != candles.length ||
+        oldDelegate.following != following ||
+        oldDelegate.highlightId != highlightId ||
+        oldDelegate.entries.length != entries.length ||
+        (candles.isNotEmpty &&
+            oldDelegate.candles.isNotEmpty &&
+            (oldDelegate.candles.last.close != candles.last.close ||
+                oldDelegate.candles.last.high != candles.last.high ||
+                oldDelegate.candles.last.low != candles.last.low));
+  }
 }

@@ -40,6 +40,23 @@ class Validators {
     return null;
   }
 
+  static String? liveDepositAmount(String? value) {
+    if (value == null || value.trim().isEmpty) {
+      return 'Enter a deposit amount';
+    }
+    final parsed = double.tryParse(value.replaceAll(',', '').replaceAll('\$', '').trim());
+    if (parsed == null) {
+      return 'Enter a valid amount';
+    }
+    if (parsed < 50) {
+      return 'Minimum deposit is \$50.';
+    }
+    if (parsed > 5000) {
+      return 'Maximum deposit is \$5,000.';
+    }
+    return null;
+  }
+
   static String? confirmPassword(String? value, String original) {
     if (value == null || value.isEmpty) {
       return 'Confirm your password';

@@ -6,6 +6,7 @@ import '../../core/services/app_scope.dart';
 import '../../widgets/brand/trade_pulse_logo.dart';
 import '../../widgets/cards/demo_balance_card.dart';
 import '../../widgets/cards/asset_grid.dart';
+import '../../widgets/cards/live_cash_action_bar.dart';
 import '../../widgets/cards/quick_action_card.dart';
 import '../../widgets/feedback/empty_state.dart';
 import '../../widgets/layout/entrance.dart';
@@ -37,8 +38,18 @@ class HomeScreen extends StatelessWidget {
             ),
             const SizedBox(height: 20),
             const Entrance(
-              delay: Duration(milliseconds: 60),
+              delay: Duration(milliseconds: 40),
+              child: LiveCashActionBar(),
+            ),
+            const SizedBox(height: 16),
+            const Entrance(
+              delay: Duration(milliseconds: 70),
               child: DemoBalanceCard(),
+            ),
+            const SizedBox(height: 12),
+            const Entrance(
+              delay: Duration(milliseconds: 90),
+              child: LiveBalanceCard(),
             ),
             const SizedBox(height: 24),
             const SectionHeader(

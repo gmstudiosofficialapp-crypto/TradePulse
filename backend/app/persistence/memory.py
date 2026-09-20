@@ -119,13 +119,13 @@ class MemoryLedger:
             available = self.accounts.get_balance(user_id)
             if stake > available:
                 raise ValueError("Insufficient demo balance")
-            open_on_asset = [
+            open_trades = [
                 item
                 for item in self.trades.list_for_user(user_id)
-                if item["asset"] == asset and item.get("result") is None
+                if item.get("result") is None
             ]
-            if len(open_on_asset) >= max_open:
-                raise ValueError("Maximum 10 active demo trades for this asset")
+            if len(open_trades) >= max_open:
+                raise ValueError("Maximum 10 active trades reached.")
             before = available
             after = round(available - stake, 2)
             self.accounts.set_balance(user_id, after)
@@ -134,6 +134,27 @@ class MemoryLedger:
             self.trades.save(trade)
             self.transactions.save(transaction)
             return dict(trade)
+
+    def commit_credit(self, user_id: str, amount: float) -> float:
+        with self._lock:
+            if amount <= 0:
+                raise ValueError("Invalid credit amount")
+            before = self.accounts.get_balance(user_id)
+            after = round(before + amount, 2)
+            self.accounts.set_balance(user_id, after)
+            self.transactions.save(
+                {
+                    "transaction_id": f"demo-credit-{user_id}-{datetime.now(timezone.utc).isoformat()}",
+                    "user_id": user_id,
+                    "type": "DEMO_CREDIT",
+                    "amount": round(amount, 2),
+                    "balanceBefore": before,
+                    "balanceAfter": after,
+                    "simulated": True,
+                    "createdAt": datetime.now(timezone.utc).isoformat(),
+                }
+            )
+            return after
 
     def commit_settle(
         self,

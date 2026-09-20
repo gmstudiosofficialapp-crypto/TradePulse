@@ -12,6 +12,7 @@ import 'core/services/auth_controller.dart';
 import 'core/services/auth_service.dart';
 import 'core/services/firebase_auth_service.dart';
 import 'core/services/local_auth_service.dart';
+import 'core/services/live_wallet_controller.dart';
 import 'core/services/market_controller.dart';
 import 'core/services/market_data_service.dart';
 import 'core/services/offline_market_data_service.dart';
@@ -20,6 +21,7 @@ import 'core/services/trading_controller.dart';
 import 'core/services/trading_service.dart';
 import 'core/services/websocket_market_data_service.dart';
 import 'core/theme/app_theme.dart';
+import 'core/utils/password_reset_link.dart';
 import 'firebase_options.dart';
 
 Future<void> main() async {
@@ -56,6 +58,7 @@ class _TradePulseAppState extends State<TradePulseApp> {
   late final SettingsController _settings;
   late final MarketController _market;
   late final TradingController _trading;
+  late final LiveWalletController _wallet;
 
   @override
   void initState() {
@@ -69,6 +72,8 @@ class _TradePulseAppState extends State<TradePulseApp> {
     _trading = TradingController(
       TradingService(tokenProvider: _authService.idToken),
     );
+    _wallet = LiveWalletController();
+    unawaited(_wallet.restore());
     _settings.addListener(_rebuild);
     _auth.addListener(_onAuth);
     _market.events.listen(_trading.applyEvent);
@@ -100,6 +105,7 @@ class _TradePulseAppState extends State<TradePulseApp> {
     _settings.dispose();
     _market.dispose();
     _trading.dispose();
+    _wallet.dispose();
     super.dispose();
   }
 
@@ -111,8 +117,19 @@ class _TradePulseAppState extends State<TradePulseApp> {
       theme: AppTheme.light(),
       darkTheme: AppTheme.dark(),
       themeMode: _settings.themeMode,
-      initialRoute: AppRoutes.splash,
-      onGenerateRoute: (settings) => AppRouter.onGenerateRoute(settings, _auth),
+      initialRoute: PasswordResetLink.isReset(Uri.base)
+          ? AppRoutes.resetPassword
+          : AppRoutes.splash,
+      onGenerateRoute: (settings) {
+        final resolved = settings.name == AppRoutes.resetPassword &&
+                settings.arguments == null
+            ? RouteSettings(
+                name: settings.name,
+                arguments: PasswordResetLink.oobCodeFrom(Uri.base),
+              )
+            : settings;
+        return AppRouter.onGenerateRoute(resolved, _auth);
+      },
       builder: (context, child) {
         return AuthScope(
           auth: _auth,
@@ -122,7 +139,10 @@ class _TradePulseAppState extends State<TradePulseApp> {
               market: _market,
               child: TradingScope(
                 trading: _trading,
-                child: child ?? const SizedBox.shrink(),
+                child: LiveWalletScope(
+                  wallet: _wallet,
+                  child: child ?? const SizedBox.shrink(),
+                ),
               ),
             ),
           ),

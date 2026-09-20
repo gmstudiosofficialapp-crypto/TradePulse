@@ -80,6 +80,16 @@ class DemoTradingEngine:
     def balance(self, user_id: str) -> float:
         return self.accounts.get_balance(user_id)
 
+    def credit_demo(self, user_id: str, amount: float) -> float:
+        if amount <= 0:
+            raise ValueError("Invalid credit amount")
+        credited = round(amount, 2)
+        if hasattr(self.ledger, "commit_credit"):
+            return self.ledger.commit_credit(user_id, credited)
+        after = round(self.balance(user_id) + credited, 2)
+        self.accounts.set_balance(user_id, after)
+        return after
+
     def ensure_account(self, user_id: str, email: str = "", name: str = "") -> dict:
         if hasattr(self.accounts, "ensure_user"):
             return self.accounts.ensure_user(user_id, email=email, name=name)

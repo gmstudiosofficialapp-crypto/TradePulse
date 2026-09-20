@@ -2,7 +2,7 @@
 
 ## Cryptocurrency
 PNG icons from [cryptocurrency-icons](https://github.com/spothq/cryptocurrency-icons)
-(MIT License). Used for BTC, ETH, SOL, XRP, and DOGE.
+(MIT License). Used for BTC, ETH, SOL, XRP, DOGE, USDT, and USDC.
 
 ## Flags
 ISO flag PNGs from Flagcdn, stored locally for EUR, GBP, USD, JPY, AUD, CAD, CHF.

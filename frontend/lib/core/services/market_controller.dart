@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math' as math;
 
 import 'package:flutter/foundation.dart';
 
@@ -19,6 +20,7 @@ class MarketController extends ChangeNotifier {
   String focusedAsset = 'BTC/USD-OTC';
   StreamSubscription<MarketCandle>? _candleSub;
   StreamSubscription<EngineState>? _connSub;
+  StreamSubscription<Map<String, dynamic>>? _eventSub;
   Timer? _poll;
 
   Stream<Map<String, dynamic>> get events => _service.eventStream;
@@ -26,6 +28,7 @@ class MarketController extends ChangeNotifier {
   Future<void> start() async {
     await _service.connect();
     _candleSub = _service.candleStream.listen(_onCandle);
+    _eventSub = _service.eventStream.listen(_onEvent);
     _connSub = _service.connectionState.listen((state) {
       status = MarketStatus(state: state, simulated: true);
       notifyListeners();
@@ -51,6 +54,9 @@ class MarketController extends ChangeNotifier {
             trail.removeRange(0, trail.length - 24);
           }
         }
+        if (quote.asset == focusedAsset) {
+          _applyLivePrice(quote.asset, quote.price, quote.timestamp);
+        }
       }
       notifyListeners();
     } catch (_) {
@@ -70,20 +76,102 @@ class MarketController extends ChangeNotifier {
     focusedAsset = asset;
     candles = await _service.getHistoricalCandles(asset);
     await _service.subscribeAsset(asset);
+    final quote = quotes[asset];
+    if (quote != null) {
+      _applyLivePrice(asset, quote.price, quote.timestamp);
+    }
+    notifyListeners();
+  }
+
+  void _onEvent(Map<String, dynamic> event) {
+    final type = event['type'];
+    if (type != 'market_tick' && type != 'tick') return;
+    final data = event['data'];
+    if (data is! Map) return;
+    final asset = data['asset'] as String? ?? event['asset'] as String?;
+    final price = (data['price'] as num?)?.toDouble();
+    if (asset == null || price == null || asset != focusedAsset) return;
+    final stamp = DateTime.tryParse('${data['timestamp'] ?? ''}')?.toUtc();
+    _applyLivePrice(asset, price, stamp);
     notifyListeners();
   }
 
   void _onCandle(MarketCandle candle) {
     if (candle.asset != focusedAsset) return;
-    final index = candles.indexWhere(
-      (item) => item.openTime == candle.openTime,
-    );
-    if (index >= 0) {
-      candles[index] = candle;
-    } else {
-      candles = [...candles, candle];
-    }
+    _upsertCandle(candle);
     notifyListeners();
+  }
+
+  void _upsertCandle(MarketCandle candle) {
+    final key = candle.minuteKey;
+    final index = candles.indexWhere((item) => item.minuteKey == key);
+    if (index >= 0) {
+      final current = candles[index];
+      if (current.closed && !candle.closed) return;
+      final next = [...candles];
+      next[index] = candle;
+      candles = next;
+    } else {
+      candles = [...candles, candle]..sort((a, b) => a.openTime.compareTo(b.openTime));
+    }
+    if (candles.length > 360) {
+      candles = candles.sublist(candles.length - 360);
+    }
+  }
+
+  void _applyLivePrice(String asset, double price, DateTime? timestamp) {
+    if (asset != focusedAsset || candles.isEmpty) return;
+    final stamp = timestamp ?? DateTime.now().toUtc();
+    final last = candles.last;
+    final bucket = DateTime.utc(
+      stamp.year,
+      stamp.month,
+      stamp.day,
+      stamp.hour,
+      stamp.minute,
+    );
+    if (last.closed) {
+      if (bucket.millisecondsSinceEpoch ~/ 60000 == last.minuteKey) return;
+      _upsertCandle(
+        MarketCandle(
+          asset: asset,
+          open: price,
+          high: price,
+          low: price,
+          close: price,
+          volume: 1,
+          openTime: bucket,
+          closeTime: stamp,
+          closed: false,
+        ),
+      );
+      return;
+    }
+    if (bucket.millisecondsSinceEpoch ~/ 60000 != last.minuteKey) {
+      _upsertCandle(
+        MarketCandle(
+          asset: asset,
+          open: price,
+          high: price,
+          low: price,
+          close: price,
+          volume: 1,
+          openTime: bucket,
+          closeTime: stamp,
+          closed: false,
+        ),
+      );
+      return;
+    }
+    candles = [
+      ...candles.sublist(0, candles.length - 1),
+      last.copyWith(
+        close: price,
+        high: math.max(last.high, price),
+        low: math.min(last.low, price),
+        closeTime: stamp,
+      ),
+    ];
   }
 
   @override
@@ -91,6 +179,7 @@ class MarketController extends ChangeNotifier {
     _poll?.cancel();
     unawaited(_candleSub?.cancel());
     unawaited(_connSub?.cancel());
+    unawaited(_eventSub?.cancel());
     unawaited(_service.disconnect());
     super.dispose();
   }

@@ -16,6 +16,10 @@ class OpenTradeBody(BaseModel):
     live: bool = False
 
 
+class DemoCreditBody(BaseModel):
+    amount: float = Field(gt=0, le=1_000_000)
+
+
 class ProfileBody(BaseModel):
     fullName: str | None = None
     username: str | None = None
@@ -78,6 +82,22 @@ def demo_balance(user: AuthUser) -> dict:
     return {
         "user_id": user.uid,
         "balance": get_trading().balance(user.uid),
+        "simulated": True,
+        "account_type": "DEMO",
+    }
+
+
+@router.post("/demo/credit")
+def demo_credit(body: DemoCreditBody, user: AuthUser) -> dict:
+    _bootstrap(user)
+    try:
+        balance = get_trading().credit_demo(user.uid, body.amount)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return {
+        "user_id": user.uid,
+        "balance": balance,
+        "credited": round(body.amount, 2),
         "simulated": True,
         "account_type": "DEMO",
     }

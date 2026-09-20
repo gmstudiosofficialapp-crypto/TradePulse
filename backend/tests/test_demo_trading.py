@@ -30,17 +30,28 @@ def test_stake_limits_per_signal() -> None:
     assert other["stake"] == 10000
 
 
-def test_ten_open_trades_per_asset() -> None:
+def test_ten_open_trades_total() -> None:
     engine = DemoTradingEngine()
     for index in range(10):
         engine.open_trade("alice", "BTC/USD-OTC", "BUY", 1, 100 + index)
-    with pytest.raises(ValueError, match="Maximum 10"):
+    with pytest.raises(ValueError, match="Maximum 10 active trades reached"):
         engine.open_trade("alice", "BTC/USD-OTC", "SELL", 1, 120)
-    engine.open_trade("alice", "ETH/USD-OTC", "BUY", 1, 200)
-    open_btc = [t for t in engine.trades.list_for_user("alice") if t["asset"] == "BTC/USD-OTC" and t["result"] is None]
+    with pytest.raises(ValueError, match="Maximum 10 active trades reached"):
+        engine.open_trade("alice", "ETH/USD-OTC", "BUY", 1, 200)
+    open_btc = [t for t in engine.trades.list_for_user("alice") if t["result"] is None]
     engine.settle(open_btc[0]["trade_id"], open_btc[0]["entry_price"] + 1)
-    extra = engine.open_trade("alice", "BTC/USD-OTC", "SELL", 1, 130)
+    extra = engine.open_trade("alice", "ETH/USD-OTC", "SELL", 1, 130)
     assert extra["direction"] == "SELL"
+
+
+def test_demo_credit_is_spendable() -> None:
+    engine = DemoTradingEngine()
+    assert engine.credit_demo("alice", 5000) == 15000.0
+    trade = engine.open_trade("alice", "BTC/USD-OTC", "BUY", 10000, 100)
+    assert trade["stake"] == 10000
+    assert engine.balance("alice") == 5000.0
+    engine.open_trade("alice", "BTC/USD-OTC", "SELL", 5000, 100)
+    assert engine.balance("alice") == 0.0
 
 
 def test_buy_win() -> None:

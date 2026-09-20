@@ -124,6 +124,9 @@ void main() {
   test('authentic crypto icon paths are bundled', () {
     expect(AssetIconCatalog.of('BTC/USD-OTC').primaryAsset, contains('btc.png'));
     expect(AssetIconCatalog.of('ETH/USD-OTC').primaryAsset, contains('eth.png'));
+    expect(AssetIconCatalog.of('BTC').primaryAsset, contains('btc.png'));
+    expect(AssetIconCatalog.of('USDT').primaryAsset, contains('usdt.png'));
+    expect(AssetIconCatalog.of('USDC').primaryAsset, contains('usdc.png'));
     expect(AssetIconCatalog.of('NASDAQ-OTC').primaryAsset, isNull);
   });
 }

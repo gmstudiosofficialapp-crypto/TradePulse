@@ -158,7 +158,6 @@ class FirestoreLedger:
         open_query = (
             self._db.collection("trades")
             .where("user_id", "==", user_id)
-            .where("asset", "==", asset)
             .where("status", "==", "OPEN")
         )
 
@@ -182,7 +181,7 @@ class FirestoreLedger:
                 raise ValueError("Insufficient demo balance")
             open_docs = list(txn.get(open_query))
             if len(open_docs) >= max_open:
-                raise ValueError("Maximum 10 active demo trades for this asset")
+                raise ValueError("Maximum 10 active trades reached.")
             after = round(available - stake, 2)
             txn.set(
                 account_ref,
@@ -194,6 +193,43 @@ class FirestoreLedger:
             txn.set(trade_ref, dict(trade))
             txn.set(txn_ref, dict(transaction))
             return dict(trade)
+
+        return _apply(self._db.transaction())
+
+    def commit_credit(self, user_id: str, amount: float) -> float:
+        if amount <= 0:
+            raise ValueError("Invalid credit amount")
+        account_ref = self._db.collection("accounts").document(user_id)
+        txn_id = f"demo-credit-{user_id}-{_now()}"
+        txn_ref = self._db.collection("transactions").document(txn_id)
+
+        @firestore.transactional
+        def _apply(txn) -> float:
+            snap = account_ref.get(transaction=txn)
+            if snap.exists:
+                before = float((snap.to_dict() or {}).get("balance", self.accounts.initial))
+            else:
+                before = self.accounts.initial
+            after = round(before + amount, 2)
+            txn.set(
+                account_ref,
+                {"uid": user_id, "balance": after, "updatedAt": _now()},
+                merge=True,
+            )
+            txn.set(
+                txn_ref,
+                {
+                    "transaction_id": txn_id,
+                    "user_id": user_id,
+                    "type": "DEMO_CREDIT",
+                    "amount": round(amount, 2),
+                    "balanceBefore": before,
+                    "balanceAfter": after,
+                    "simulated": True,
+                    "createdAt": _now(),
+                },
+            )
+            return after
 
         return _apply(self._db.transaction())
 

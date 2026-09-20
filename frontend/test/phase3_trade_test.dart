@@ -22,17 +22,24 @@ class _FakeTrading extends TradingService {
   String? lastAsset;
   int? lastExpiry;
   int _opens = 0;
+  double _balance = 10000;
   final List<DemoTrade> opened = [];
 
   @override
   Future<void> ensureAccount() async {}
 
   @override
-  Future<double> getBalance(String userId) async => 10000;
+  Future<double> getBalance(String userId) async => _balance;
+
+  @override
+  Future<double> creditDemo(double amount) async {
+    _balance += amount;
+    return _balance;
+  }
 
   @override
   Future<DemoStatistics> getStatistics(String userId) async =>
-      const DemoStatistics(currentBalance: 10000);
+      DemoStatistics(currentBalance: _balance);
 
   @override
   Future<List<DemoTrade>> getTrades(String userId) async => List.of(opened);
@@ -59,6 +66,7 @@ class _FakeTrading extends TradingService {
     lastAsset = asset;
     lastExpiry = expirySeconds;
     _opens += 1;
+    _balance -= stake;
     final trade = DemoTrade(
       tradeId: 'opened-$_opens',
       asset: asset,
@@ -142,8 +150,9 @@ void main() {
     await tester.pumpWidget(_harness(child: const TradeScreen()));
     await tester.pump();
     expect(find.textContaining('BUY'), findsWidgets);
-    expect(find.textContaining('BUY 91%'), findsOneWidget);
+    expect(find.textContaining('BUY 91%'), findsNothing);
     expect(find.textContaining('Confidence:'), findsNothing);
+    expect(find.textContaining('SELL 91%'), findsNothing);
   });
 
   testWidgets('BUY and SELL controls', (tester) async {
@@ -177,8 +186,10 @@ void main() {
     );
     await tester.pumpWidget(_harness(child: const TradeScreen(), trading: trading));
     await tester.pump();
-    expect(find.textContaining('Active trade', skipOffstage: false), findsOneWidget);
-    expect(find.textContaining('Direction: BUY'), findsOneWidget);
+    expect(find.textContaining('Active 1', skipOffstage: false), findsOneWidget);
+    await tester.tap(find.textContaining('Active 1'));
+    await tester.pump();
+    expect(find.textContaining('BUY', skipOffstage: false), findsWidgets);
   });
 
   testWidgets('result state', (tester) async {
@@ -198,8 +209,8 @@ void main() {
     );
     await tester.pumpWidget(_harness(child: const TradeScreen(), trading: trading));
     await tester.pump();
-    expect(find.text('WIN', skipOffstage: false), findsOneWidget);
-    expect(find.textContaining('P/L'), findsWidgets);
+    expect(find.textContaining('P/L'), findsNothing);
+    expect(find.textContaining('BTC/USD-OTC   P/L'), findsNothing);
   });
 
   testWidgets('history rendering', (tester) async {
@@ -346,6 +357,49 @@ void main() {
     expect(trading.activeTrades, hasLength(2));
     expect(trading.activeTrades.map((item) => item.direction).toSet(), {'BUY', 'SELL'});
     expect(trading.canOpenTrade('BTC/USD-OTC'), isTrue);
+  });
+
+  testWidgets('eleventh trade is rejected with a clear message', (tester) async {
+    final service = _FakeTrading();
+    final trading = TradingController(service)..userId = 'ada@example.com';
+    for (var i = 0; i < 10; i++) {
+      await trading.openTrade(asset: 'BTC/USD-OTC', direction: 'BUY');
+    }
+    await trading.openTrade(asset: 'BTC/USD-OTC', direction: 'SELL');
+    expect(trading.activeTrades, hasLength(10));
+    expect(trading.error, 'Maximum 10 active trades reached.');
+    expect(service.opened, hasLength(10));
+  });
+
+  testWidgets('trade amount bounds are validated', (tester) async {
+    final trading = TradingController(_FakeTrading())..userId = 'ada@example.com';
+    trading.setStake(0.5);
+    await trading.openTrade(asset: 'BTC/USD-OTC', direction: 'BUY');
+    expect(trading.error, r'Minimum trade amount is $1.');
+    expect(trading.activeTrades, isEmpty);
+    trading.setStake(10001);
+    await trading.openTrade(asset: 'BTC/USD-OTC', direction: 'BUY');
+    expect(trading.error, r'Maximum trade amount is $10,000.');
+    trading.setStake(1);
+    await trading.openTrade(asset: 'BTC/USD-OTC', direction: 'BUY');
+    expect(trading.activeTrades, hasLength(1));
+    trading.setStake(10);
+    await trading.openTrade(asset: 'BTC/USD-OTC', direction: 'SELL');
+    expect(trading.activeTrades, hasLength(2));
+    trading.setStake(10000);
+    await trading.openTrade(asset: 'BTC/USD-OTC', direction: 'BUY');
+    expect(trading.error, 'Insufficient demo balance');
+  });
+
+  testWidgets('demo deposit is immediately spendable', (tester) async {
+    final service = _FakeTrading();
+    final trading = TradingController(service)..userId = 'ada@example.com';
+    await trading.addDemoFunds(5000);
+    expect(trading.demoDisplayBalance, 15000);
+    trading.setStake(10000);
+    await trading.openTrade(asset: 'BTC/USD-OTC', direction: 'BUY');
+    expect(trading.activeTrades, hasLength(1));
+    expect(trading.demoDisplayBalance, 5000);
   });
 
   testWidgets('markets card navigates with asset argument', (tester) async {

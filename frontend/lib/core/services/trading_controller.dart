@@ -16,6 +16,7 @@ class TradingController extends ChangeNotifier {
   double stake = 10;
   int expirySeconds = 60;
   bool submitting = false;
+  int _openInFlight = 0;
   DemoStatistics statistics = const DemoStatistics();
   List<DemoTrade> history = [];
   List<TradeSignal> signals = [];
@@ -49,20 +50,35 @@ class TradingController extends ChangeNotifier {
 
   double get demoDisplayBalance => balance + sessionDemoCredit;
 
-  bool canOpenTrade(String asset) =>
-      !submitting &&
-      activeTradesFor(asset).length < AppConstants.maxActiveSignalsPerAsset;
+  int get _reservedSlots => activeTrades.length + _openInFlight;
 
-  void addDemoFunds(double amount) {
+  bool canOpenTrade(String asset) =>
+      _reservedSlots < AppConstants.maxActiveSignalsPerAsset;
+
+  bool get atActiveLimit =>
+      _reservedSlots >= AppConstants.maxActiveSignalsPerAsset;
+
+  Future<void> addDemoFunds(double amount) async {
     if (amount <= 0) return;
     sessionDemoCredit += amount;
     notifyListeners();
+    final id = userId;
+    try {
+      final next = await _service.creditDemo(amount);
+      sessionDemoCredit = (sessionDemoCredit - amount).clamp(0, double.infinity);
+      balance = next;
+      error = null;
+    } catch (_) {
+      if (id == null) {
+        // Session-only preview credit stays local.
+      }
+    }
+    notifyListeners();
   }
 
-  void restoreDemoFunds() {
+  Future<void> restoreDemoFunds() async {
     final needed = 10000 - demoDisplayBalance;
-    if (needed > 0) sessionDemoCredit += needed;
-    notifyListeners();
+    if (needed > 0) await addDemoFunds(needed);
   }
 
   Future<void> bindUser(String? identity) async {
@@ -82,12 +98,9 @@ class TradingController extends ChangeNotifier {
     try {
       balance = await _service.getBalance(id);
       statistics = await _service.getStatistics(id);
-      history = await _service.getTrades(id);
+      history = _mergeHistory(await _service.getTrades(id));
       if (asset != null) {
         await loadSignal(asset);
-      }
-      if (activeTrade == null && history.isNotEmpty && history.first.result != null) {
-        lastResult = history.first;
       }
       error = null;
       notifyListeners();
@@ -119,12 +132,19 @@ class TradingController extends ChangeNotifier {
   }
 
   void setStake(double value) {
-    stake = value.clamp(AppConstants.minStake, AppConstants.maxStake).toDouble();
+    stake = value;
     notifyListeners();
   }
 
   void bumpStake(double delta) {
-    setStake(stake + delta);
+    setStake(
+      (stake + delta).clamp(AppConstants.minStake, AppConstants.maxStake).toDouble(),
+    );
+  }
+
+  void showMessage(String message) {
+    error = message.isEmpty ? null : message;
+    notifyListeners();
   }
 
   Future<void> openTrade({
@@ -137,17 +157,27 @@ class TradingController extends ChangeNotifier {
       notifyListeners();
       return;
     }
-    if (submitting) return;
-    if (stake < AppConstants.minStake || stake > AppConstants.maxStake) {
-      error = 'Amount must be \$1.00 to \$10,000.00';
+    if (stake < AppConstants.minStake) {
+      error = 'Minimum trade amount is \$1.';
       notifyListeners();
       return;
     }
-    if (activeTradesFor(asset).length >= AppConstants.maxActiveSignalsPerAsset) {
-      error = 'Maximum 10 active trades for this asset';
+    if (stake > AppConstants.maxStake) {
+      error = 'Maximum trade amount is \$10,000.';
       notifyListeners();
       return;
     }
+    if (_reservedSlots >= AppConstants.maxActiveSignalsPerAsset) {
+      error = 'Maximum 10 active trades reached.';
+      notifyListeners();
+      return;
+    }
+    if (stake > demoDisplayBalance) {
+      error = 'Insufficient demo balance';
+      notifyListeners();
+      return;
+    }
+    _openInFlight += 1;
     submitting = true;
     error = null;
     notifyListeners();
@@ -166,7 +196,8 @@ class TradingController extends ChangeNotifier {
     } catch (exc) {
       error = exc.toString().replaceFirst('Exception: ', '');
     } finally {
-      submitting = false;
+      _openInFlight = (_openInFlight - 1).clamp(0, 10);
+      submitting = _openInFlight > 0;
       notifyListeners();
     }
   }
@@ -215,6 +246,16 @@ class TradingController extends ChangeNotifier {
       trade,
       ...history.where((item) => item.tradeId != trade.tradeId),
     ];
+  }
+
+  List<DemoTrade> _mergeHistory(List<DemoTrade> remote) {
+    final byId = {for (final item in remote) item.tradeId: item};
+    for (final local in history) {
+      if (local.isOpen && !byId.containsKey(local.tradeId)) {
+        byId[local.tradeId] = local;
+      }
+    }
+    return byId.values.toList();
   }
 
   void _upsertSignal(TradeSignal next) {

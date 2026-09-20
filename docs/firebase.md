@@ -19,6 +19,20 @@ TRADEPULSE_PERSISTENCE=firestore
 
 Never put that JSON in Flutter or commit it.
 
+## Password reset (Firebase native)
+
+Forgot Password uses Firebase Authentication `sendPasswordResetEmail`. TradePulse does **not** send OTP mail through the backend.
+
+Console:
+
+1. Authentication → Templates → Password reset → customize action URL to the TradePulse web origin, for example:
+   - local: `http://127.0.0.1:8090/#/reset-password`
+   - production host once it exists
+2. Authorized domains must include that host.
+3. Leave Email/Password enabled. Do not configure SendGrid, SMTP, or Resend for this flow.
+
+The email link includes Firebase's `mode=resetPassword` and `oobCode`. Flutter parses those parameters once on landing, verifies with `verifyPasswordResetCode`, and updates the Firebase password with `confirmPasswordReset`. Action codes are never stored in Firestore or local storage.
+
 ## Local run
 
 Backend (after credentials are set):

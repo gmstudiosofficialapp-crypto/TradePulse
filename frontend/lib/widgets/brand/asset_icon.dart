@@ -145,10 +145,30 @@ class AssetIconCatalog {
           letters: 'BTC',
           primaryAsset: '$crypto/btc.png',
         ),
+      'BTC' => const AssetIconSpec(
+          color: Color(0xFFF7931A),
+          letters: 'BTC',
+          primaryAsset: '$crypto/btc.png',
+        ),
       'ETH/USD-OTC' => const AssetIconSpec(
           color: Color(0xFF627EEA),
           letters: 'ETH',
           primaryAsset: '$crypto/eth.png',
+        ),
+      'ETH' => const AssetIconSpec(
+          color: Color(0xFF627EEA),
+          letters: 'ETH',
+          primaryAsset: '$crypto/eth.png',
+        ),
+      'USDT' => const AssetIconSpec(
+          color: Color(0xFF26A17B),
+          letters: 'USDT',
+          primaryAsset: '$crypto/usdt.png',
+        ),
+      'USDC' => const AssetIconSpec(
+          color: Color(0xFF2775CA),
+          letters: 'USDC',
+          primaryAsset: '$crypto/usdc.png',
         ),
       'SOL/USD-OTC' => const AssetIconSpec(
           color: Color(0xFF9945FF),

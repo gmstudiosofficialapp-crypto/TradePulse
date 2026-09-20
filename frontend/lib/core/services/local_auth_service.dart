@@ -14,6 +14,8 @@ class _StoredAccount {
 class LocalAuthService implements AuthService {
   final Map<String, _StoredAccount> _accounts = {};
   UserProfile? _session;
+  final Map<String, String> _resetCodes = {};
+  final Set<String> _usedCodes = {};
 
   String _key(String email) => email.trim().toLowerCase();
 
@@ -66,10 +68,57 @@ class LocalAuthService implements AuthService {
   @override
   Future<void> resetPassword({required String email}) async {
     await _pause();
+    final key = _key(email);
+    if (!_accounts.containsKey(key)) {
+      throw const AuthException('No account found for that email');
+    }
+    _resetCodes[key] = 'action-$key';
+  }
+
+  @override
+  Future<String> verifyResetActionCode(String oobCode) async {
+    await _pause();
+    return _emailForCode(oobCode);
+  }
+
+  @override
+  Future<void> confirmPasswordReset({
+    required String oobCode,
+    required String newPassword,
+  }) async {
+    await _pause();
+    final email = _emailForCode(oobCode);
     final account = _accounts[_key(email)];
     if (account == null) {
-      throw const AuthException('No demo account found for that email');
+      throw const AuthException(
+        'This reset link is invalid or has already been used.',
+      );
     }
+    account.password = newPassword;
+    _usedCodes.add(oobCode);
+    _resetCodes.remove(_key(email));
+  }
+
+  String _emailForCode(String oobCode) {
+    if (oobCode == 'expired') {
+      throw const AuthException(
+        'This reset link has expired. Request a new email.',
+      );
+    }
+    if (oobCode.isEmpty || oobCode == 'invalid' || _usedCodes.contains(oobCode)) {
+      throw const AuthException(
+        'This reset link is invalid or has already been used.',
+      );
+    }
+    for (final entry in _resetCodes.entries) {
+      if (entry.value == oobCode) return entry.key;
+    }
+    if (oobCode.startsWith('action-')) {
+      return oobCode.substring('action-'.length);
+    }
+    throw const AuthException(
+      'This reset link is invalid or has already been used.',
+    );
   }
 
   @override
