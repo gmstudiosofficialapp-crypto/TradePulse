@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://tradepulse-3fzb.onrender.com/sitemap.xml
