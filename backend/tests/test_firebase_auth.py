@@ -107,7 +107,7 @@ def test_shared_store_survives_engine_restart() -> None:
         transactions=txns,
         ledger=MemoryLedger(accounts, trades, txns),
     )
-    assert second.balance("uid5") == 10008.5
+    assert second.balance("uid5") == 10009.2
     assert second.trades.list_for_user("uid5")[0]["result"] == "WIN"
     assert second.transactions.list_for_user("uid5")
 

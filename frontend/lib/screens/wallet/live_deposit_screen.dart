@@ -11,6 +11,7 @@ import '../../widgets/buttons/primary_button.dart';
 import '../../widgets/cards/premium_card.dart';
 import '../../widgets/feedback/error_state.dart';
 import '../../widgets/forms/app_text_field.dart';
+import '../../widgets/layout/atmosphere_background.dart';
 import '../../widgets/layout/responsive_body.dart';
 
 class LiveDepositScreen extends StatefulWidget {
@@ -49,7 +50,9 @@ class _LiveDepositScreenState extends State<LiveDepositScreen> {
   @override
   Widget build(BuildContext context) {
     final colors = context.tpColors;
-    return Scaffold(
+    final onSurface = Theme.of(context).colorScheme.onSurface;
+    return AtmosphereBackground(
+      child: Scaffold(
       backgroundColor: Colors.transparent,
       appBar: AppBar(
         title: const Text('Deposit'),
@@ -89,7 +92,13 @@ class _LiveDepositScreenState extends State<LiveDepositScreen> {
                 ),
               ),
               const SizedBox(height: 20),
-              Text('Payment method', style: Theme.of(context).textTheme.titleMedium),
+              Text(
+                'Payment method',
+                style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.w800,
+                      color: onSurface,
+                    ),
+              ),
               const SizedBox(height: 10),
               for (final asset in LivePaymentAsset.values) ...[
                 _AssetTile(
@@ -100,7 +109,13 @@ class _LiveDepositScreenState extends State<LiveDepositScreen> {
                 const SizedBox(height: 8),
               ],
               const SizedBox(height: 12),
-              Text('Amount', style: Theme.of(context).textTheme.titleMedium),
+              Text(
+                'Amount',
+                style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.w800,
+                      color: onSurface,
+                    ),
+              ),
               const SizedBox(height: 8),
               Wrap(
                 spacing: 8,
@@ -141,6 +156,7 @@ class _LiveDepositScreenState extends State<LiveDepositScreen> {
           ),
         ),
       ),
+    ),
     );
   }
 }

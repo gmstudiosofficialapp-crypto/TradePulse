@@ -5,6 +5,7 @@ import '../../core/theme/app_colors.dart';
 import '../../core/utils/app_utils.dart';
 import '../../widgets/buttons/primary_button.dart';
 import '../../widgets/cards/premium_card.dart';
+import '../../widgets/layout/atmosphere_background.dart';
 import '../../widgets/layout/responsive_body.dart';
 
 class LiveWithdrawScreen extends StatelessWidget {
@@ -13,7 +14,8 @@ class LiveWithdrawScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colors = context.tpColors;
-    return Scaffold(
+    return AtmosphereBackground(
+      child: Scaffold(
       backgroundColor: Colors.transparent,
       appBar: AppBar(
         title: const Text('Withdraw'),
@@ -73,6 +75,7 @@ class LiveWithdrawScreen extends StatelessWidget {
           ],
         ),
       ),
+    ),
     );
   }
 }

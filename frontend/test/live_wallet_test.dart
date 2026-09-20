@@ -16,8 +16,10 @@ import 'package:tradepulse_frontend/core/utils/app_utils.dart';
 import 'package:tradepulse_frontend/core/utils/validators.dart';
 import 'package:tradepulse_frontend/models/live_wallet_models.dart';
 import 'package:tradepulse_frontend/screens/home/home_screen.dart';
+import 'package:tradepulse_frontend/screens/wallet/live_deposit_confirm_screen.dart';
 import 'package:tradepulse_frontend/screens/wallet/live_deposit_screen.dart';
 import 'package:tradepulse_frontend/screens/wallet/live_withdraw_screen.dart';
+import 'package:tradepulse_frontend/widgets/layout/viewport_sync.dart';
 import 'package:tradepulse_frontend/widgets/cards/demo_balance_card.dart';
 
 class _SilentTrading extends TradingService {
@@ -75,6 +77,34 @@ Future<AuthController> _auth(WidgetTester tester) async {
 void main() {
   setUp(LiveWalletStore.reset);
 
+  test('money formatting keeps selected deposit amounts readable', () {
+    expect(AppUtils.formatMoney(50), r'$50.00');
+    expect(AppUtils.formatMoney(2500), r'$2,500.00');
+    expect(AppUtils.formatMoney(5000), r'$5,000.00');
+  });
+
+  testWidgets('stale keyboard insets do not shrink the viewport', (tester) async {
+    late MediaQueryData seen;
+    await tester.pumpWidget(
+      MediaQuery(
+        data: const MediaQueryData(
+          size: Size(390, 844),
+          viewInsets: EdgeInsets.only(bottom: 320),
+        ),
+        child: ViewportSync(
+          child: Builder(
+            builder: (context) {
+              seen = MediaQuery.of(context);
+              return const SizedBox.shrink();
+            },
+          ),
+        ),
+      ),
+    );
+    expect(seen.viewInsets.bottom, 0);
+    expect(seen.size.height, 844);
+  });
+
   test('live deposit amount bounds', () {
     expect(Validators.liveDepositAmount('49.99'), isNotNull);
     expect(Validators.liveDepositAmount('50'), isNull);
@@ -84,10 +114,19 @@ void main() {
   });
 
   test('placeholder addresses match selected assets', () {
-    expect(LivePaymentAsset.btc.placeholderAddress, 'YOUR_BTC_DEPOSIT_ADDRESS');
-    expect(LivePaymentAsset.usdtTrc20.placeholderAddress, 'YOUR_USDT_DEPOSIT_ADDRESS');
-    expect(LivePaymentAsset.eth.placeholderAddress, 'YOUR_ETH_DEPOSIT_ADDRESS');
-    expect(LivePaymentAsset.usdcErc20.placeholderAddress, 'YOUR_USDC_DEPOSIT_ADDRESS');
+    expect(
+      LivePaymentAsset.btc.placeholderAddress,
+      '1CUXN4MrQ9qyZBtqU6Pg4U7iZiy6Y3ztMt',
+    );
+    expect(
+      LivePaymentAsset.usdtTrc20.placeholderAddress,
+      'THfnsscby3ZW3LPGbTyGLyLkFsFdRwV5Xq',
+    );
+    expect(
+      LivePaymentAsset.eth.placeholderAddress,
+      '0x27e711D1B6E4866EBf7904B3B631f6D05518E1B6',
+    );
+    expect(LivePaymentAsset.values, hasLength(3));
   });
 
   test('live deposit persists across controller reload and keeps submittedAt clock', () async {
@@ -161,7 +200,7 @@ void main() {
     );
     await tester.pump();
     expect(find.text('Demo Balance'), findsOneWidget);
-    expect(find.text(r'$12500.00'), findsOneWidget);
+    expect(find.text(r'$12,500.00'), findsOneWidget);
     expect(find.text('Live Balance'), findsOneWidget);
     expect(find.text(r'$0.00'), findsWidgets);
     expect(find.text('Deposit'), findsOneWidget);
@@ -189,14 +228,14 @@ void main() {
     );
   });
 
-  testWidgets('four payment assets and selected confirmation addresses', (tester) async {
+  testWidgets('three payment assets and selected confirmation addresses', (tester) async {
     final auth = await _auth(tester);
     await tester.pumpWidget(_app(auth: auth, home: const LiveDepositScreen()));
     await tester.pump();
     expect(find.text('Bitcoin (BTC)'), findsOneWidget);
     expect(find.text('USDT — TRON (TRC20)'), findsOneWidget);
-    expect(find.text('Ethereum (ETH)'), findsOneWidget);
-    expect(find.text('USDC — ERC20'), findsOneWidget);
+    expect(find.text('ETH — ERC20'), findsOneWidget);
+    expect(find.text('USDC — ERC20'), findsNothing);
 
     Future<void> confirm(LivePaymentAsset asset, String address) async {
       await tester.tap(find.text(asset.title).first);
@@ -211,6 +250,8 @@ void main() {
       await tester.tap(find.widgetWithText(FilledButton, 'Continue').last);
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 400));
+      expect(find.text('Payment Method'), findsOneWidget);
+      expect(find.text('Deposit Amount'), findsOneWidget);
       expect(find.text(asset.title), findsWidgets);
       expect(find.text(address), findsOneWidget);
       expect(find.text(r'$100.00'), findsOneWidget);
@@ -219,10 +260,15 @@ void main() {
       await tester.pump(const Duration(milliseconds: 400));
     }
 
-    await confirm(LivePaymentAsset.btc, 'YOUR_BTC_DEPOSIT_ADDRESS');
-    await confirm(LivePaymentAsset.usdtTrc20, 'YOUR_USDT_DEPOSIT_ADDRESS');
-    await confirm(LivePaymentAsset.eth, 'YOUR_ETH_DEPOSIT_ADDRESS');
-    await confirm(LivePaymentAsset.usdcErc20, 'YOUR_USDC_DEPOSIT_ADDRESS');
+    await confirm(LivePaymentAsset.btc, '1CUXN4MrQ9qyZBtqU6Pg4U7iZiy6Y3ztMt');
+    await confirm(
+      LivePaymentAsset.usdtTrc20,
+      'THfnsscby3ZW3LPGbTyGLyLkFsFdRwV5Xq',
+    );
+    await confirm(
+      LivePaymentAsset.eth,
+      '0x27e711D1B6E4866EBf7904B3B631f6D05518E1B6',
+    );
   });
 
   testWidgets('deposit amount validation and pending history', (tester) async {
@@ -266,6 +312,29 @@ void main() {
     expect(wallet.transfers, hasLength(1));
   });
 
+  testWidgets('confirm deposit shows the selected draft amount', (tester) async {
+    final auth = await _auth(tester);
+    await tester.pumpWidget(
+      _app(
+        auth: auth,
+        home: const LiveDepositConfirmScreen(
+          draft: LiveDepositDraft(
+            asset: LivePaymentAsset.btc,
+            amount: 2500,
+          ),
+        ),
+      ),
+    );
+    await tester.pump();
+    expect(find.text('Confirm Deposit'), findsOneWidget);
+    expect(find.text('Payment Method'), findsOneWidget);
+    expect(find.text('Bitcoin (BTC)'), findsOneWidget);
+    expect(find.text('Deposit Amount'), findsOneWidget);
+    expect(find.text(r'$2,500.00'), findsOneWidget);
+    expect(find.text('1CUXN4MrQ9qyZBtqU6Pg4U7iZiy6Y3ztMt'), findsOneWidget);
+    expect(LiveWalletController.liveBalance, 0);
+  });
+
   testWidgets('withdraw stays blocked at zero live balance', (tester) async {
     final auth = await _auth(tester);
     await tester.pumpWidget(_app(auth: auth, home: const LiveWithdrawScreen()));
@@ -284,7 +353,7 @@ void main() {
       ),
     );
     await tester.pump();
-    expect(find.text(r'$10000.00'), findsOneWidget);
+    expect(find.text(r'$10,000.00'), findsOneWidget);
     expect(find.text('DEMO'), findsOneWidget);
   });
 }

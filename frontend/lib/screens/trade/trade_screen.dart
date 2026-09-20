@@ -100,7 +100,11 @@ class _TradeScreenState extends State<TradeScreen> {
     }
     final market = AppScope.market(context);
     final trading = AppScope.trading(context);
-    await trading.openTrade(asset: market.focusedAsset, direction: direction);
+    await trading.openTrade(
+      asset: market.focusedAsset,
+      direction: direction,
+      entryPrice: market.quotes[market.focusedAsset]?.price,
+    );
   }
 
   Future<void> _showLiveBlocked() async {
@@ -181,7 +185,7 @@ class _TradeScreenState extends State<TradeScreen> {
                   highlightId: _highlightId,
                   immersive: true,
                   livePrice: quote?.price,
-                  overlayInsets: const EdgeInsets.fromLTRB(0, 92, 0, 8),
+                  overlayInsets: const EdgeInsets.fromLTRB(0, 92, 0, 236),
                 ),
               ),
               Positioned(
@@ -663,7 +667,16 @@ class _ManualTradePanelState extends State<_ManualTradePanel> {
                 ),
               ],
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: 8),
+            Text(
+              'Payout ${OtcAssets.payoutLabel(AppScope.market(context).focusedAsset)}',
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w700,
+                color: colors.mutedText,
+              ),
+            ),
+            const SizedBox(height: 8),
             Row(
               children: [
                 Expanded(

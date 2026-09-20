@@ -3,6 +3,7 @@ from datetime import datetime, timedelta, timezone
 import pytest
 
 from app.core.safety import LiveTradingDisabledError, execute_live_trade
+from app.core.trading_settings import ASSET_PAYOUT_RATES
 from app.services.demo_trading import DemoTradingEngine
 
 
@@ -59,8 +60,8 @@ def test_buy_win() -> None:
     trade = engine.open_trade("alice", "BTC/USD-OTC", "BUY", 10, 100)
     settled = engine.settle(trade["trade_id"], 110)
     assert settled["result"] == "WIN"
-    assert settled["profit_loss"] == 8.5
-    assert engine.balance("alice") == 10008.5
+    assert settled["profit_loss"] == 9.2
+    assert engine.balance("alice") == 10009.2
 
 
 def test_buy_loss() -> None:
@@ -93,12 +94,30 @@ def test_draw() -> None:
     assert engine.balance("cara") == 10000.0
 
 
+def test_asset_payout_tiers() -> None:
+    engine = DemoTradingEngine()
+    btc = engine.open_trade("tier", "BTC/USD-OTC", "BUY", 10, 100)
+    xrp = engine.open_trade("tier", "XRP/USD-OTC", "BUY", 10, 1)
+    doge = engine.open_trade("tier", "DOGE/USD-OTC", "BUY", 10, 1)
+    dow = engine.open_trade("tier", "DOW JONES-OTC", "BUY", 10, 100)
+    assert btc["payout_rate"] == 0.92
+    assert xrp["payout_rate"] == 0.90
+    assert doge["payout_rate"] == 0.85
+    assert dow["payout_rate"] == 0.80
+    assert len({*ASSET_PAYOUT_RATES.values()}) == 4
+    assert sum(1 for rate in ASSET_PAYOUT_RATES.values() if rate == 0.92) == 10
+    assert sum(1 for rate in ASSET_PAYOUT_RATES.values() if rate == 0.90) == 2
+    assert sum(1 for rate in ASSET_PAYOUT_RATES.values() if rate == 0.85) == 5
+    assert sum(1 for rate in ASSET_PAYOUT_RATES.values() if rate == 0.80) == 3
+    assert len(ASSET_PAYOUT_RATES) == 20
+
+
 def test_payout_calculation() -> None:
     engine = DemoTradingEngine()
     trade = engine.open_trade("dave", "BTC/USD-OTC", "BUY", 20, 50)
     settled = engine.settle(trade["trade_id"], 51)
-    assert settled["payout_rate"] == 0.85
-    assert settled["profit_loss"] == 17.0
+    assert settled["payout_rate"] == 0.92
+    assert settled["profit_loss"] == 18.4
 
 
 def test_trade_settlement_and_history() -> None:
@@ -126,7 +145,7 @@ def test_duplicate_settlement_protection() -> None:
     first = engine.settle(trade["trade_id"], 110)
     second = engine.settle(trade["trade_id"], 80)
     assert first["result"] == second["result"] == "WIN"
-    assert engine.balance("finn") == 10008.5
+    assert engine.balance("finn") == 10009.2
 
 
 def test_multiple_users_and_assets() -> None:
@@ -135,7 +154,7 @@ def test_multiple_users_and_assets() -> None:
     b = engine.open_trade("u2", "EUR/USD-OTC", "SELL", 25, 1.1)
     engine.settle(a["trade_id"], 101)
     engine.settle(b["trade_id"], 1.2)
-    assert engine.balance("u1") == 10008.5
+    assert engine.balance("u1") == 10009.2
     assert engine.balance("u2") == 9975.0
     assert engine.statistics("u1")["wins"] == 1
     assert engine.statistics("u2")["losses"] == 1

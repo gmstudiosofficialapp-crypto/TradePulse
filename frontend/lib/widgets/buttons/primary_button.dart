@@ -32,6 +32,13 @@ class PrimaryButton extends StatelessWidget {
       ),
       child: FilledButton(
         onPressed: loading ? null : onPressed,
+        style: FilledButton.styleFrom(
+          disabledBackgroundColor: colors.accent.withValues(alpha: 0.34),
+          disabledForegroundColor: Theme.of(context)
+              .colorScheme
+              .onSurface
+              .withValues(alpha: 0.88),
+        ),
         child: loading
             ? const SizedBox(
                 width: 20,

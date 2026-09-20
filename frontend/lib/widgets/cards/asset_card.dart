@@ -83,7 +83,7 @@ class AssetCard extends StatelessWidget {
           ),
           const SizedBox(height: 8),
           Text(
-            OtcAssets.categoryLabel(asset.category),
+            '${OtcAssets.categoryLabel(asset.category)}  ·  Payout ${OtcAssets.payoutLabel(asset.symbol)}',
             style: Theme.of(context).textTheme.labelSmall?.copyWith(
                   color: colors.mutedText,
                 ),

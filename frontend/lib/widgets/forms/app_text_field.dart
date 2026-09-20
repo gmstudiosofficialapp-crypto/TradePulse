@@ -29,7 +29,13 @@ class AppTextField extends StatelessWidget {
       textInputAction: textInputAction,
       autofillHints: autofillHints,
       onFieldSubmitted: onSubmitted,
-      decoration: InputDecoration(labelText: label),
+      decoration: InputDecoration(
+        labelText: label,
+        labelStyle: TextStyle(
+          color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.82),
+          fontWeight: FontWeight.w600,
+        ),
+      ),
     );
   }
 }

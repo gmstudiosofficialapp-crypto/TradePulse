@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'auth_controller.dart';
 import 'live_wallet_controller.dart';
 import 'market_controller.dart';
+import 'pwa_install_controller.dart';
 import 'settings_controller.dart';
 import 'trading_controller.dart';
 
@@ -85,6 +86,24 @@ class LiveWalletScope extends InheritedNotifier<LiveWalletController> {
 
   static LiveWalletController? maybeOf(BuildContext context) {
     return context.dependOnInheritedWidgetOfExactType<LiveWalletScope>()?.notifier;
+  }
+}
+
+class PwaInstallScope extends InheritedNotifier<PwaInstallController> {
+  const PwaInstallScope({
+    super.key,
+    required PwaInstallController install,
+    required super.child,
+  }) : super(notifier: install);
+
+  static PwaInstallController of(BuildContext context) {
+    final scope = context.dependOnInheritedWidgetOfExactType<PwaInstallScope>();
+    assert(scope != null, 'PwaInstallScope not found');
+    return scope!.notifier!;
+  }
+
+  static PwaInstallController? maybeOf(BuildContext context) {
+    return context.dependOnInheritedWidgetOfExactType<PwaInstallScope>()?.notifier;
   }
 }
 

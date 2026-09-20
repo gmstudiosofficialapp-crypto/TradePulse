@@ -47,11 +47,18 @@ class AppTheme {
       visualDensity: VisualDensity.standard,
       dividerColor: colors.cardBorder.withValues(alpha: 0.7),
       appBarTheme: AppBarTheme(
-        backgroundColor: Colors.transparent,
+        backgroundColor: colors.canvas.withValues(alpha: 0.94),
         foregroundColor: onSurface,
         elevation: 0,
         scrolledUnderElevation: 0,
         centerTitle: false,
+        surfaceTintColor: Colors.transparent,
+        iconTheme: IconThemeData(color: onSurface),
+        titleTextStyle: TextStyle(
+          color: onSurface,
+          fontSize: 20,
+          fontWeight: FontWeight.w800,
+        ),
       ),
       cardTheme: CardThemeData(
         color: colors.card,

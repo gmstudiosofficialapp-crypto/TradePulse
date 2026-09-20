@@ -1,4 +1,5 @@
 import '../../models/otc_asset.dart';
+import 'app_constants.dart';
 
 class OtcAssets {
   static const popular = [
@@ -32,6 +33,35 @@ class OtcAssets {
     OtcAsset(symbol: 'S&P500-OTC', category: AssetCategory.indices),
     OtcAsset(symbol: 'DOW JONES-OTC', category: AssetCategory.indices),
   ];
+
+  static const payoutRates = <String, double>{
+    'BTC/USD-OTC': 0.92,
+    'ETH/USD-OTC': 0.92,
+    'SOL/USD-OTC': 0.92,
+    'EUR/USD-OTC': 0.92,
+    'GBP/USD-OTC': 0.92,
+    'USD/JPY-OTC': 0.92,
+    'GOLD/USD-OTC': 0.92,
+    'NASDAQ-OTC': 0.92,
+    'S&P500-OTC': 0.92,
+    'EUR/JPY-OTC': 0.92,
+    'XRP/USD-OTC': 0.90,
+    'GBP/JPY-OTC': 0.90,
+    'DOGE/USD-OTC': 0.85,
+    'AUD/USD-OTC': 0.85,
+    'USD/CAD-OTC': 0.85,
+    'SILVER/USD-OTC': 0.85,
+    'EUR/GBP-OTC': 0.85,
+    'USD/CHF-OTC': 0.80,
+    'AUD/JPY-OTC': 0.80,
+    'DOW JONES-OTC': 0.80,
+  };
+
+  static double payoutRate(String symbol) =>
+      payoutRates[symbol] ?? AppConstants.payoutRate;
+
+  static String payoutLabel(String symbol) =>
+      '${(payoutRate(symbol) * 100).round()}%';
 
   static String categoryLabel(AssetCategory category) {
     return switch (category) {

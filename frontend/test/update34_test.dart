@@ -1,4 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:tradepulse_frontend/core/constants/otc_assets.dart';
 import 'package:tradepulse_frontend/core/services/local_auth_service.dart';
 import 'package:tradepulse_frontend/models/chart_entry.dart';
 import 'package:tradepulse_frontend/models/market_models.dart';
@@ -128,5 +129,18 @@ void main() {
     expect(AssetIconCatalog.of('USDT').primaryAsset, contains('usdt.png'));
     expect(AssetIconCatalog.of('USDC').primaryAsset, contains('usdc.png'));
     expect(AssetIconCatalog.of('NASDAQ-OTC').primaryAsset, isNull);
+  });
+
+  test('twenty assets use the 92/90/85/80 payout split', () {
+    expect(OtcAssets.all, hasLength(20));
+    expect(OtcAssets.payoutRates, hasLength(20));
+    expect(OtcAssets.payoutLabel('BTC/USD-OTC'), '92%');
+    expect(OtcAssets.payoutLabel('XRP/USD-OTC'), '90%');
+    expect(OtcAssets.payoutLabel('DOGE/USD-OTC'), '85%');
+    expect(OtcAssets.payoutLabel('DOW JONES-OTC'), '80%');
+    expect(OtcAssets.payoutRates.values.where((rate) => rate == 0.92), hasLength(10));
+    expect(OtcAssets.payoutRates.values.where((rate) => rate == 0.90), hasLength(2));
+    expect(OtcAssets.payoutRates.values.where((rate) => rate == 0.85), hasLength(5));
+    expect(OtcAssets.payoutRates.values.where((rate) => rate == 0.80), hasLength(3));
   });
 }

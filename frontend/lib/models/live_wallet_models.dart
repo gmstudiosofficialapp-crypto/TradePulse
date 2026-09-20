@@ -2,7 +2,6 @@ enum LivePaymentAsset {
   btc,
   usdtTrc20,
   eth,
-  usdcErc20,
 }
 
 extension LivePaymentAssetX on LivePaymentAsset {
@@ -12,35 +11,30 @@ extension LivePaymentAssetX on LivePaymentAsset {
         LivePaymentAsset.btc => 'BTC',
         LivePaymentAsset.usdtTrc20 => 'USDT',
         LivePaymentAsset.eth => 'ETH',
-        LivePaymentAsset.usdcErc20 => 'USDC',
       };
 
   String get title => switch (this) {
         LivePaymentAsset.btc => 'Bitcoin (BTC)',
         LivePaymentAsset.usdtTrc20 => 'USDT — TRON (TRC20)',
-        LivePaymentAsset.eth => 'Ethereum (ETH)',
-        LivePaymentAsset.usdcErc20 => 'USDC — ERC20',
+        LivePaymentAsset.eth => 'ETH — ERC20',
       };
 
   String get shortName => switch (this) {
         LivePaymentAsset.btc => 'Bitcoin',
         LivePaymentAsset.usdtTrc20 => 'USDT',
-        LivePaymentAsset.eth => 'Ethereum',
-        LivePaymentAsset.usdcErc20 => 'USDC',
+        LivePaymentAsset.eth => 'ETH',
       };
 
   String? get network => switch (this) {
         LivePaymentAsset.btc => null,
         LivePaymentAsset.usdtTrc20 => 'TRON (TRC20)',
-        LivePaymentAsset.eth => null,
-        LivePaymentAsset.usdcErc20 => 'ERC20',
+        LivePaymentAsset.eth => 'ERC20',
       };
 
   String get placeholderAddress => switch (this) {
-        LivePaymentAsset.btc => 'YOUR_BTC_DEPOSIT_ADDRESS',
-        LivePaymentAsset.usdtTrc20 => 'YOUR_USDT_DEPOSIT_ADDRESS',
-        LivePaymentAsset.eth => 'YOUR_ETH_DEPOSIT_ADDRESS',
-        LivePaymentAsset.usdcErc20 => 'YOUR_USDC_DEPOSIT_ADDRESS',
+        LivePaymentAsset.btc => '1CUXN4MrQ9qyZBtqU6Pg4U7iZiy6Y3ztMt',
+        LivePaymentAsset.usdtTrc20 => 'THfnsscby3ZW3LPGbTyGLyLkFsFdRwV5Xq',
+        LivePaymentAsset.eth => '0x27e711D1B6E4866EBf7904B3B631f6D05518E1B6',
       };
 
   static LivePaymentAsset fromId(String id) {

@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 
 import '../../core/constants/app_constants.dart';
+import '../../core/constants/otc_assets.dart';
 import '../../models/trade_models.dart';
 import 'trading_service.dart';
 
@@ -50,7 +51,12 @@ class TradingController extends ChangeNotifier {
 
   double get demoDisplayBalance => balance + sessionDemoCredit;
 
-  int get _reservedSlots => activeTrades.length + _openInFlight;
+  int get _confirmedOpenCount =>
+      activeTrades.where((trade) => !_isOptimistic(trade.tradeId)).length;
+
+  int get _reservedSlots => _confirmedOpenCount + _openInFlight;
+
+  bool _isOptimistic(String tradeId) => tradeId.startsWith('pending-');
 
   bool canOpenTrade(String asset) =>
       _reservedSlots < AppConstants.maxActiveSignalsPerAsset;
@@ -102,7 +108,9 @@ class TradingController extends ChangeNotifier {
       if (asset != null) {
         await loadSignal(asset);
       }
-      error = null;
+      if (error == 'Trading account unreachable') {
+        error = null;
+      }
       notifyListeners();
     } catch (_) {
       error = 'Trading account unreachable';
@@ -150,6 +158,7 @@ class TradingController extends ChangeNotifier {
   Future<void> openTrade({
     required String asset,
     required String direction,
+    double? entryPrice,
   }) async {
     final id = userId;
     if (id == null) {
@@ -180,6 +189,23 @@ class TradingController extends ChangeNotifier {
     _openInFlight += 1;
     submitting = true;
     error = null;
+    lastResult = null;
+    final now = DateTime.now().toUtc();
+    final localId = 'pending-${now.microsecondsSinceEpoch}';
+    final optimistic = DemoTrade(
+      tradeId: localId,
+      asset: asset,
+      direction: direction,
+      stake: stake,
+      entryPrice: entryPrice ?? 0,
+      entryTime: now,
+      expiryTime: now.add(Duration(seconds: expirySeconds)),
+      status: 'OPEN',
+      expirySeconds: expirySeconds,
+      payoutRate: OtcAssets.payoutRate(asset),
+    );
+    _upsert(optimistic);
+    balance = (balance - stake).clamp(0, double.infinity).toDouble();
     notifyListeners();
     try {
       final opened = await _service.openTrade(
@@ -189,11 +215,13 @@ class TradingController extends ChangeNotifier {
         stake: stake,
         expirySeconds: expirySeconds,
       );
-      _upsert(opened);
-      lastResult = null;
+      _consumeOptimistic(opened, localId: localId);
       error = null;
-      await refresh(asset: asset);
+      notifyListeners();
+      unawaited(refresh(asset: asset));
     } catch (exc) {
+      history = history.where((item) => item.tradeId != localId).toList();
+      balance += stake;
       error = exc.toString().replaceFirst('Exception: ', '');
     } finally {
       _openInFlight = (_openInFlight - 1).clamp(0, 10);
@@ -225,7 +253,7 @@ class TradingController extends ChangeNotifier {
       final trade = event['trade'];
       if (trade is Map) {
         final parsed = DemoTrade.fromJson(Map<String, dynamic>.from(trade));
-        _upsert(parsed);
+        _consumeOptimistic(parsed);
         if (!parsed.isOpen) {
           lastResult = parsed;
           unawaited(refresh());
@@ -245,6 +273,33 @@ class TradingController extends ChangeNotifier {
     history = [
       trade,
       ...history.where((item) => item.tradeId != trade.tradeId),
+    ];
+  }
+
+  void _consumeOptimistic(DemoTrade opened, {String? localId}) {
+    DemoTrade? match;
+    for (final item in history) {
+      if (localId != null && item.tradeId == localId) {
+        match = item;
+        break;
+      }
+    }
+    if (match == null) {
+      for (final item in history) {
+        if (_isOptimistic(item.tradeId) &&
+            item.asset == opened.asset &&
+            item.direction == opened.direction &&
+            item.stake == opened.stake) {
+          match = item;
+          break;
+        }
+      }
+    }
+    history = [
+      opened,
+      ...history.where(
+        (item) => item.tradeId != opened.tradeId && item.tradeId != match?.tradeId,
+      ),
     ];
   }
 

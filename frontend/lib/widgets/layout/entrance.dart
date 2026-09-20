@@ -10,10 +10,12 @@ class Entrance extends StatelessWidget {
   final Widget child;
   final Duration delay;
 
+  static final _tween = Tween<double>(begin: 0, end: 1);
+
   @override
   Widget build(BuildContext context) {
     return TweenAnimationBuilder<double>(
-      tween: Tween(begin: 0, end: 1),
+      tween: _tween,
       duration: const Duration(milliseconds: 420) + delay,
       curve: Curves.easeOutCubic,
       builder: (context, value, child) {

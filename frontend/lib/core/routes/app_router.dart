@@ -38,7 +38,12 @@ class AppRouter {
     return PageRouteBuilder<void>(
       settings: RouteSettings(name: name, arguments: settings.arguments),
       pageBuilder: (context, animation, secondaryAnimation) => page,
+      transitionDuration: const Duration(milliseconds: 240),
+      reverseTransitionDuration: const Duration(milliseconds: 180),
       transitionsBuilder: (context, animation, secondaryAnimation, child) {
+        if (animation.status == AnimationStatus.completed) {
+          return child;
+        }
         final fade = CurvedAnimation(
           parent: animation,
           curve: Curves.easeOutCubic,

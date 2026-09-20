@@ -1,7 +1,7 @@
 from dataclasses import dataclass, field
 
 from app.core.safety import LIVE_TRADING_ENABLED
-from app.core.trading_settings import TradingSettings
+from app.core.trading_settings import ASSET_PAYOUT_RATES, TradingSettings
 from signal_engine.config.settings import SignalSettings
 
 
@@ -23,6 +23,7 @@ class AdminMarketControl:
             "simulated": True,
             "account_type": "DEMO",
             "payout_rate": self.trading.payout_rate,
+            "payout_rates": dict(ASSET_PAYOUT_RATES),
             "initial_demo_balance": self.trading.initial_balance,
             "expiry_seconds": self.trading.expiry_seconds,
             "allowed_expiry_seconds": list(self.trading.allowed_expiry_seconds),

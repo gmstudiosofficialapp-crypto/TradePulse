@@ -29,7 +29,17 @@ class AppUtils {
   }
 
   static String formatMoney(double value) {
-    return '\$${value.toStringAsFixed(2)}';
+    final parts = value.abs().toStringAsFixed(2).split('.');
+    final digits = parts[0];
+    final grouped = StringBuffer();
+    for (var i = 0; i < digits.length; i++) {
+      if (i > 0 && (digits.length - i) % 3 == 0) {
+        grouped.write(',');
+      }
+      grouped.write(digits[i]);
+    }
+    final sign = value < 0 ? '-' : '';
+    return '$sign\$${grouped.toString()}.${parts[1]}';
   }
 
   static String formatSignedMoney(double value) {

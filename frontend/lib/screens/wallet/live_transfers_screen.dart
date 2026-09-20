@@ -7,6 +7,7 @@ import '../../models/live_wallet_models.dart';
 import '../../widgets/brand/asset_icon.dart';
 import '../../widgets/cards/premium_card.dart';
 import '../../widgets/feedback/empty_state.dart';
+import '../../widgets/layout/atmosphere_background.dart';
 import '../../widgets/layout/responsive_body.dart';
 
 class LiveTransfersScreen extends StatelessWidget {
@@ -18,7 +19,8 @@ class LiveTransfersScreen extends StatelessWidget {
     final colors = context.tpColors;
     final items = wallet.transfers;
 
-    return Scaffold(
+    return AtmosphereBackground(
+      child: Scaffold(
       backgroundColor: Colors.transparent,
       appBar: AppBar(title: const Text('Deposit & Withdraw History')),
       body: ResponsiveBody(
@@ -32,7 +34,7 @@ class LiveTransfersScreen extends StatelessWidget {
                 ),
               )
             : ListView.separated(
-                padding: const EdgeInsets.all(20),
+                padding: const EdgeInsets.fromLTRB(20, 16, 20, 28),
                 itemCount: items.length,
                 separatorBuilder: (_, _) => const SizedBox(height: 10),
                 itemBuilder: (context, index) {
@@ -83,6 +85,7 @@ class LiveTransfersScreen extends StatelessWidget {
                 },
               ),
       ),
+    ),
     );
   }
 }

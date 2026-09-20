@@ -106,7 +106,7 @@ class _CandlestickChartState extends State<CandlestickChart>
       }
       return;
     }
-    final alpha = (1 - math.exp(-dt / 0.22)).clamp(0.0, 1.0);
+    final alpha = (1 - math.exp(-dt / 0.055)).clamp(0.0, 1.0);
     final nextClose = _shownClose + (targetClose - _shownClose) * alpha;
     final nextHigh = math.max(math.max(last.high, last.open), nextClose);
     final nextLow = math.min(math.min(last.low, last.open), nextClose);
@@ -301,14 +301,39 @@ class _CandlePainter extends CustomPainter {
       if (candle.high > maxP) maxP = candle.high;
       if (candle.low < minP) minP = candle.low;
     }
+    final live = candles.last.close;
+    if (live > maxP) maxP = live;
+    if (live < minP) minP = live;
     for (final entry in entries) {
+      if (entry.entryPrice <= 0) continue;
       if (entry.entryPrice > maxP) maxP = entry.entryPrice;
       if (entry.entryPrice < minP) minP = entry.entryPrice;
     }
-    final pad = (maxP - minP).abs() < 0.0000001 ? 1.0 : (maxP - minP) * 0.08;
+    final rawSpan = (maxP - minP).abs();
+    final minSpan = math.max(live.abs() * 0.0012, 0.00001);
+    final pad = rawSpan < minSpan
+        ? (minSpan - rawSpan) / 2 + minSpan * 0.18
+        : rawSpan * 0.10;
     maxP += pad;
     minP -= pad;
-    final span = maxP - minP;
+    if (following) {
+      var spanNow = maxP - minP;
+      if (spanNow > 0) {
+        final pos = (live - minP) / spanNow;
+        const lo = 0.34;
+        const hi = 0.66;
+        if (pos < lo) {
+          minP = (live - lo * maxP) / (1 - lo);
+        } else if (pos > hi) {
+          maxP = (live - minP * (1 - hi)) / hi;
+        }
+      }
+    }
+    final span = (maxP - minP).abs().clamp(minSpan, double.infinity);
+    if (maxP <= minP) {
+      maxP = live + span / 2;
+      minP = live - span / 2;
+    }
     final last = candles.last.close;
 
     final gridPaint = Paint()
@@ -327,9 +352,11 @@ class _CandlePainter extends CustomPainter {
     }
 
     final candleWidth = plot.width / candles.length;
-    final bodyHalf = (candleWidth * 0.32).clamp(2.2, 14.0);
-    final wickWidth = (candleWidth * 0.08).clamp(1.2, 2.4);
+    final bodyHalf = (candleWidth * 0.28).clamp(2.4, 11.0);
+    final wickWidth = (candleWidth * 0.07).clamp(1.0, 2.0);
 
+    canvas.save();
+    canvas.clipRect(plot);
     for (var i = 0; i < candles.length; i++) {
       final candle = candles[i];
       final color = candle.close >= candle.open ? up : down;
@@ -340,11 +367,11 @@ class _CandlePainter extends CustomPainter {
       final yClose = yFor(candle.close);
       final bodyTop = math.min(yOpen, yClose);
       final bodyBottom = math.max(yOpen, yClose);
-      final minBody = math.max(3.0, bodyHalf * 0.7);
+      final minBody = math.max(1.6, bodyHalf * 0.45);
       final height = math.max(minBody, bodyBottom - bodyTop);
       final bodyCenterY = (yOpen + yClose) / 2;
       final wickSpan = (yLow - yHigh).abs();
-      if (wickSpan > height + 1.0) {
+      if (wickSpan > 0.4) {
         final wick = Paint()
           ..color = color
           ..strokeWidth = wickWidth
@@ -363,6 +390,7 @@ class _CandlePainter extends CustomPainter {
         Paint()..color = color,
       );
     }
+    canvas.restore();
 
     double? xAt(DateTime time) {
       final stamp = time.toUtc();

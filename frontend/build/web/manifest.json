@@ -1,11 +1,13 @@
 {
-    "name": "tradepulse_frontend",
-    "short_name": "tradepulse_frontend",
-    "start_url": ".",
+    "name": "TradePulse",
+    "short_name": "TradePulse",
+    "id": "/",
+    "start_url": "./",
+    "scope": "./",
     "display": "standalone",
     "background_color": "#0B1730",
     "theme_color": "#0B1730",
-    "description": "A new Flutter project.",
+    "description": "TradePulse OTC demo trading.",
     "orientation": "portrait-primary",
     "prefer_related_applications": false,
     "icons": [

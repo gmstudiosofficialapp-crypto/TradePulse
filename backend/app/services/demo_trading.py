@@ -4,7 +4,7 @@ import uuid
 from datetime import datetime, timedelta, timezone
 
 from app.core.safety import execute_live_trade
-from app.core.trading_settings import TradingSettings
+from app.core.trading_settings import TradingSettings, payout_rate_for
 from app.persistence.memory import (
     MemoryAccountStore,
     MemoryLedger,
@@ -140,7 +140,7 @@ class DemoTradingEngine:
             "expiry_time": (moment + timedelta(seconds=duration)).isoformat(),
             "expiry_seconds": duration,
             "expiry_price": None,
-            "payout_rate": self.settings.payout_rate,
+            "payout_rate": payout_rate_for(asset, self.settings.payout_rate),
             "result": None,
             "profit_loss": 0.0,
             "status": "OPEN",

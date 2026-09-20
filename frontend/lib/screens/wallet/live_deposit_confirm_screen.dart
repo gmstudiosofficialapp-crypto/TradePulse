@@ -11,6 +11,7 @@ import '../../widgets/buttons/primary_button.dart';
 import '../../widgets/cards/premium_card.dart';
 import '../../widgets/feedback/error_state.dart';
 import '../../widgets/forms/app_text_field.dart';
+import '../../widgets/layout/atmosphere_background.dart';
 import '../../widgets/layout/responsive_body.dart';
 
 class LiveDepositConfirmScreen extends StatefulWidget {
@@ -68,80 +69,94 @@ class _LiveDepositConfirmScreenState extends State<LiveDepositConfirmScreen> {
     }
   }
 
+  TextStyle _labelStyle(BuildContext context) {
+    return Theme.of(context).textTheme.titleSmall!.copyWith(
+          fontWeight: FontWeight.w700,
+          color: Theme.of(context).colorScheme.onSurface,
+        );
+  }
+
   @override
   Widget build(BuildContext context) {
     final asset = widget.draft.asset;
     final colors = context.tpColors;
-    return Scaffold(
-      backgroundColor: Colors.transparent,
-      appBar: AppBar(title: const Text('Confirm deposit')),
-      body: ResponsiveBody(
-        child: ListView(
-          padding: const EdgeInsets.all(20),
-          children: [
-            PremiumCard(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      AssetIcon(symbol: asset.iconSymbol, size: 40),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Text(
-                          asset.title,
-                          style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                                fontWeight: FontWeight.w800,
-                              ),
+    return AtmosphereBackground(
+      child: Scaffold(
+        backgroundColor: Colors.transparent,
+        appBar: AppBar(title: const Text('Confirm Deposit')),
+        body: ResponsiveBody(
+          child: ListView(
+            padding: const EdgeInsets.fromLTRB(20, 16, 20, 28),
+            children: [
+              PremiumCard(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('Payment Method', style: _labelStyle(context)),
+                    const SizedBox(height: 10),
+                    Row(
+                      children: [
+                        AssetIcon(symbol: asset.iconSymbol, size: 40),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Text(
+                            asset.title,
+                            style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                                  fontWeight: FontWeight.w800,
+                                ),
+                          ),
                         ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 16),
-                  Text('Amount', style: TextStyle(color: colors.mutedText, fontSize: 12)),
-                  Text(
-                    AppUtils.formatMoney(widget.draft.amount),
-                    style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                          fontWeight: FontWeight.w800,
-                        ),
-                  ),
-                  const SizedBox(height: 16),
-                  Text('Deposit Address', style: TextStyle(color: colors.mutedText, fontSize: 12)),
-                  SelectableText(
-                    asset.placeholderAddress,
-                    style: const TextStyle(fontWeight: FontWeight.w700),
-                  ),
-                  const SizedBox(height: 12),
-                  OutlinedButton.icon(
-                    onPressed: _copy,
-                    icon: const Icon(Icons.copy, size: 16),
-                    label: const Text('Copy Address'),
-                  ),
-                ],
+                      ],
+                    ),
+                    const SizedBox(height: 20),
+                    Text('Deposit Amount', style: _labelStyle(context)),
+                    const SizedBox(height: 6),
+                    Text(
+                      AppUtils.formatMoney(widget.draft.amount),
+                      style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                            fontWeight: FontWeight.w800,
+                            color: Theme.of(context).colorScheme.onSurface,
+                          ),
+                    ),
+                    const SizedBox(height: 20),
+                    Text('Deposit Address', style: _labelStyle(context)),
+                    const SizedBox(height: 6),
+                    SelectableText(
+                      asset.placeholderAddress,
+                      style: const TextStyle(fontWeight: FontWeight.w700),
+                    ),
+                    const SizedBox(height: 14),
+                    OutlinedButton.icon(
+                      onPressed: _copy,
+                      icon: const Icon(Icons.copy, size: 16),
+                      label: const Text('Copy Address'),
+                    ),
+                  ],
+                ),
               ),
-            ),
-            const SizedBox(height: 16),
-            AppTextField(
-              label: 'Transaction ID / TXID',
-              controller: _txid,
-            ),
-            const SizedBox(height: 16),
-            if (_error != null) ...[
-              ErrorState(message: _error!),
+              const SizedBox(height: 18),
+              AppTextField(
+                label: 'Transaction ID / TXID',
+                controller: _txid,
+              ),
+              const SizedBox(height: 18),
+              if (_error != null) ...[
+                ErrorState(message: _error!),
+                const SizedBox(height: 12),
+              ],
+              PrimaryButton(
+                label: 'Submit Deposit',
+                loading: _loading,
+                onPressed: _loading ? null : _submit,
+              ),
               const SizedBox(height: 12),
+              Text(
+                'Simulated request only. Live balance stays \$0.00.',
+                style: TextStyle(color: colors.mutedText, fontSize: 12),
+                textAlign: TextAlign.center,
+              ),
             ],
-            PrimaryButton(
-              label: 'Submit Deposit',
-              loading: _loading,
-              onPressed: _loading ? null : _submit,
-            ),
-            const SizedBox(height: 8),
-            Text(
-              'Simulated request only. Live balance stays \$0.00.',
-              style: TextStyle(color: colors.mutedText, fontSize: 12),
-              textAlign: TextAlign.center,
-            ),
-          ],
+          ),
         ),
       ),
     );

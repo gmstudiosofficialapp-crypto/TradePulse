@@ -18,6 +18,26 @@ import 'package:tradepulse_frontend/screens/trade/trade_screen.dart';
 import 'package:tradepulse_frontend/widgets/cards/demo_balance_card.dart';
 import 'package:tradepulse_frontend/widgets/charts/candlestick_chart.dart';
 
+class _SlowTrading extends _FakeTrading {
+  @override
+  Future<DemoTrade> openTrade({
+    required String userId,
+    required String asset,
+    required String direction,
+    required double stake,
+    int expirySeconds = 60,
+  }) async {
+    await Future<void>.delayed(const Duration(milliseconds: 280));
+    return super.openTrade(
+      userId: userId,
+      asset: asset,
+      direction: direction,
+      stake: stake,
+      expirySeconds: expirySeconds,
+    );
+  }
+}
+
 class _FakeTrading extends TradingService {
   String? lastAsset;
   int? lastExpiry;
@@ -167,7 +187,7 @@ void main() {
   testWidgets('demo balance display', (tester) async {
     await tester.pumpWidget(_harness(child: const DemoBalanceCard()));
     await tester.pump();
-    expect(find.text(r'$10000.00'), findsOneWidget);
+    expect(find.text(r'$10,000.00'), findsOneWidget);
     expect(find.textContaining('DEMO'), findsWidgets);
   });
 
@@ -347,6 +367,25 @@ void main() {
     await tester.pump();
     expect(service.lastAsset, isNull);
     expect(trading.activeTrade, isNull);
+  });
+
+  testWidgets('entry marker appears before the server open returns', (tester) async {
+    final service = _SlowTrading();
+    final trading = TradingController(service)..userId = 'ada@example.com';
+    final opened = trading.openTrade(
+      asset: 'BTC/USD-OTC',
+      direction: 'BUY',
+      entryPrice: 67245,
+    );
+    await tester.pump();
+    expect(trading.activeTrades, hasLength(1));
+    expect(trading.activeTrades.single.tradeId, startsWith('pending-'));
+    expect(trading.activeTrades.single.entryPrice, 67245);
+    await tester.pump(const Duration(milliseconds: 350));
+    await opened;
+    expect(trading.activeTrades, hasLength(1));
+    expect(trading.activeTrades.single.tradeId, 'opened-1');
+    expect(service.opened, hasLength(1));
   });
 
   testWidgets('multiple independent demo trades can stay open', (tester) async {

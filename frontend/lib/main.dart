@@ -16,12 +16,15 @@ import 'core/services/live_wallet_controller.dart';
 import 'core/services/market_controller.dart';
 import 'core/services/market_data_service.dart';
 import 'core/services/offline_market_data_service.dart';
+import 'core/services/pwa_install_controller.dart';
 import 'core/services/settings_controller.dart';
 import 'core/services/trading_controller.dart';
 import 'core/services/trading_service.dart';
 import 'core/services/websocket_market_data_service.dart';
 import 'core/theme/app_theme.dart';
 import 'core/utils/password_reset_link.dart';
+import 'widgets/layout/viewport_sync.dart';
+import 'widgets/pwa/pwa_install_banner.dart';
 import 'firebase_options.dart';
 
 Future<void> main() async {
@@ -43,10 +46,12 @@ class TradePulseApp extends StatefulWidget {
     super.key,
     this.authService,
     this.marketService,
+    this.pwaInstall,
   });
 
   final AuthService? authService;
   final MarketDataService? marketService;
+  final PwaInstallController? pwaInstall;
 
   @override
   State<TradePulseApp> createState() => _TradePulseAppState();
@@ -59,6 +64,7 @@ class _TradePulseAppState extends State<TradePulseApp> {
   late final MarketController _market;
   late final TradingController _trading;
   late final LiveWalletController _wallet;
+  late final PwaInstallController _pwa;
 
   @override
   void initState() {
@@ -73,6 +79,9 @@ class _TradePulseAppState extends State<TradePulseApp> {
       TradingService(tokenProvider: _authService.idToken),
     );
     _wallet = LiveWalletController();
+    _pwa = widget.pwaInstall ?? PwaInstallController();
+    _pwa.attach();
+    _pwa.addListener(_rebuild);
     unawaited(_wallet.restore());
     _settings.addListener(_rebuild);
     _auth.addListener(_onAuth);
@@ -105,7 +114,11 @@ class _TradePulseAppState extends State<TradePulseApp> {
     _settings.dispose();
     _market.dispose();
     _trading.dispose();
+    _pwa.removeListener(_rebuild);
     _wallet.dispose();
+    if (widget.pwaInstall == null) {
+      _pwa.dispose();
+    }
     super.dispose();
   }
 
@@ -131,17 +144,27 @@ class _TradePulseAppState extends State<TradePulseApp> {
         return AppRouter.onGenerateRoute(resolved, _auth);
       },
       builder: (context, child) {
-        return AuthScope(
-          auth: _auth,
-          child: SettingsScope(
-            settings: _settings,
-            child: MarketScope(
-              market: _market,
-              child: TradingScope(
-                trading: _trading,
-                child: LiveWalletScope(
-                  wallet: _wallet,
-                  child: child ?? const SizedBox.shrink(),
+        return ViewportSync(
+          child: AuthScope(
+            auth: _auth,
+            child: SettingsScope(
+              settings: _settings,
+              child: MarketScope(
+                market: _market,
+                child: TradingScope(
+                  trading: _trading,
+                  child: LiveWalletScope(
+                    wallet: _wallet,
+                    child: PwaInstallScope(
+                      install: _pwa,
+                      child: Stack(
+                        children: [
+                          child ?? const SizedBox.shrink(),
+                          const PwaInstallBanner(),
+                        ],
+                      ),
+                    ),
+                  ),
                 ),
               ),
             ),
