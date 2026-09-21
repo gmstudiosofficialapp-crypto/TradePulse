@@ -21,18 +21,22 @@ class _ViewportSyncState extends State<ViewportSync> with WidgetsBindingObserver
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
-    _stop = metrics.listenViewport(() {
-      if (mounted) setState(() {});
-    });
+    FocusManager.instance.addListener(_sync);
+    metrics.pinHost();
+    _stop = metrics.listenViewport(_sync);
   }
 
-  @override
-  void didChangeMetrics() {
+  void _sync() {
+    metrics.pinHost();
     if (mounted) setState(() {});
   }
 
   @override
+  void didChangeMetrics() => _sync();
+
+  @override
   void dispose() {
+    FocusManager.instance.removeListener(_sync);
     WidgetsBinding.instance.removeObserver(this);
     _stop?.call();
     super.dispose();
@@ -42,16 +46,26 @@ class _ViewportSyncState extends State<ViewportSync> with WidgetsBindingObserver
   Widget build(BuildContext context) {
     final media = MediaQuery.of(context);
     final focused = FocusManager.instance.primaryFocus?.hasFocus ?? false;
-    final keyboardOpen = metrics.visualKeyboardOpen() ||
-        (media.viewInsets.bottom > 80 && focused);
-    final inner = metrics.windowInnerHeight();
-    final height = keyboardOpen
-        ? media.size.height
-        : math.max(media.size.height, inner ?? media.size.height);
+    final overlap = metrics.keyboardOverlap();
+    final browserH = metrics.layoutHeight() ?? metrics.windowInnerHeight();
+    final restored =
+        browserH != null && browserH > media.size.height + 40;
+    final visualOpen = overlap > 80;
+    final flutterOpen = media.viewInsets.bottom > 80 && focused;
+    final keyboardOpen = !restored && (visualOpen || flutterOpen);
+    final height = restored
+        ? browserH
+        : keyboardOpen
+            ? media.size.height
+            : math.max(media.size.height, browserH ?? media.size.height);
+    final inset = keyboardOpen
+        ? math.max(media.viewInsets.bottom, overlap)
+        : 0.0;
+
     return MediaQuery(
       data: media.copyWith(
         size: Size(media.size.width, height),
-        viewInsets: keyboardOpen ? media.viewInsets : EdgeInsets.zero,
+        viewInsets: EdgeInsets.only(bottom: inset),
       ),
       child: widget.child,
     );

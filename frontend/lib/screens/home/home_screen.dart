@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../core/constants/otc_assets.dart';
 import '../../core/routes/app_routes.dart';
 import '../../core/services/app_scope.dart';
+import '../../core/theme/app_colors.dart';
 import '../../widgets/brand/trade_pulse_logo.dart';
 import '../../widgets/cards/demo_balance_card.dart';
 import '../../widgets/cards/asset_grid.dart';
@@ -12,6 +13,7 @@ import '../../widgets/feedback/empty_state.dart';
 import '../../widgets/layout/entrance.dart';
 import '../../widgets/layout/responsive_body.dart';
 import '../../widgets/layout/section_header.dart';
+import '../../widgets/pwa/pwa_install_banner.dart';
 
 class HomeScreen extends StatelessWidget {
   const HomeScreen({super.key});
@@ -30,26 +32,26 @@ class HomeScreen extends StatelessWidget {
         child: ListView(
           padding: const EdgeInsets.all(20),
           children: [
-            const Entrance(
-              child: Align(
-                alignment: Alignment.centerLeft,
-                child: TradePulseLogo(compact: true, showTagline: true),
-              ),
-            ),
+            const Entrance(child: _HomeHero()),
             const SizedBox(height: 20),
             const Entrance(
               delay: Duration(milliseconds: 40),
-              child: LiveCashActionBar(),
-            ),
-            const SizedBox(height: 16),
-            const Entrance(
-              delay: Duration(milliseconds: 70),
               child: DemoBalanceCard(),
             ),
             const SizedBox(height: 12),
             const Entrance(
-              delay: Duration(milliseconds: 90),
+              delay: Duration(milliseconds: 70),
               child: LiveBalanceCard(),
+            ),
+            const SizedBox(height: 24),
+            const SectionHeader(
+              title: 'Manage Funds',
+              subtitle: 'Deposit or withdraw from your Live account',
+            ),
+            const SizedBox(height: 12),
+            const Entrance(
+              delay: Duration(milliseconds: 90),
+              child: LiveCashActionBar(),
             ),
             const SizedBox(height: 24),
             const SectionHeader(
@@ -138,8 +140,42 @@ class HomeScreen extends StatelessWidget {
                   : 'Activity appears after you place a trade.',
               icon: Icons.receipt_long_outlined,
             ),
+            const PwaInstallBanner(),
           ],
         ),
+      ),
+    );
+  }
+}
+
+class _HomeHero extends StatelessWidget {
+  const _HomeHero();
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.tpColors;
+    return Align(
+      alignment: Alignment.centerLeft,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const TradePulseLogo(compact: true, showTagline: false),
+          const SizedBox(height: 10),
+          Text(
+            'OTC Trading Platform',
+            style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                  fontWeight: FontWeight.w700,
+                ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            'Fast • Simple • Trading',
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: colors.mutedText,
+                  letterSpacing: 0.2,
+                ),
+          ),
+        ],
       ),
     );
   }

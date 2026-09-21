@@ -115,7 +115,7 @@ Widget _bannerApp(PwaInstallController controller) {
       child: PwaInstallScope(
         install: controller,
         child: const Scaffold(
-          body: Stack(children: [SizedBox.expand(), PwaInstallBanner()]),
+          body: PwaInstallBanner(),
         ),
       ),
     ),

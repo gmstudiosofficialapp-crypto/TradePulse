@@ -79,8 +79,8 @@ class _CandlestickChartState extends State<CandlestickChart>
     final last = widget.candles.last;
     _liveOpen = last.openTime;
     _shownClose = last.close;
-    _shownHigh = last.high;
-    _shownLow = last.low;
+    _shownHigh = math.max(last.open, last.close);
+    _shownLow = math.min(last.open, last.close);
   }
 
   void _tick(Duration elapsed) {
@@ -106,15 +106,14 @@ class _CandlestickChartState extends State<CandlestickChart>
       }
       return;
     }
-    final alpha = (1 - math.exp(-dt / 0.055)).clamp(0.0, 1.0);
-    final nextClose = _shownClose + (targetClose - _shownClose) * alpha;
-    final nextHigh = math.max(math.max(last.high, last.open), nextClose);
-    final nextLow = math.min(math.min(last.low, last.open), nextClose);
-    if ((nextClose - _shownClose).abs() < 0.0000001 &&
-        (nextHigh - _shownHigh).abs() < 0.0000001 &&
-        (nextLow - _shownLow).abs() < 0.0000001) {
-      return;
-    }
+    final alpha = (1 - math.exp(-dt / 0.32)).clamp(0.0, 1.0);
+    var nextClose = _shownClose + (targetClose - _shownClose) * alpha;
+    final scale = math.max(targetClose.abs(), math.max(last.open.abs(), 1e-9));
+    final band = scale * 0.00012;
+    final t = elapsed.inMilliseconds / 1000.0;
+    nextClose += band * (0.55 * math.sin(t * 7.3) + 0.45 * math.sin(t * 11.1));
+    final nextHigh = math.max(math.max(_shownHigh, last.open), nextClose);
+    final nextLow = math.min(math.min(_shownLow, last.open), nextClose);
     setState(() {
       _shownClose = nextClose;
       _shownHigh = nextHigh;
@@ -367,8 +366,10 @@ class _CandlePainter extends CustomPainter {
       final yClose = yFor(candle.close);
       final bodyTop = math.min(yOpen, yClose);
       final bodyBottom = math.max(yOpen, yClose);
+      final forming = i == candles.length - 1 && !candle.closed;
       final minBody = math.max(1.6, bodyHalf * 0.45);
-      final height = math.max(minBody, bodyBottom - bodyTop);
+      final rawHeight = bodyBottom - bodyTop;
+      final height = forming ? math.max(0.9, rawHeight) : math.max(minBody, rawHeight);
       final bodyCenterY = (yOpen + yClose) / 2;
       final wickSpan = (yLow - yHigh).abs();
       if (wickSpan > 0.4) {

@@ -31,6 +31,12 @@ extension LivePaymentAssetX on LivePaymentAsset {
         LivePaymentAsset.eth => 'ERC20',
       };
 
+  String get depositNetworkLabel => switch (this) {
+        LivePaymentAsset.btc => 'Bitcoin Network',
+        LivePaymentAsset.usdtTrc20 => 'TRON (TRC20)',
+        LivePaymentAsset.eth => 'Ethereum Network',
+      };
+
   String get placeholderAddress => switch (this) {
         LivePaymentAsset.btc => '1CUXN4MrQ9qyZBtqU6Pg4U7iZiy6Y3ztMt',
         LivePaymentAsset.usdtTrc20 => 'THfnsscby3ZW3LPGbTyGLyLkFsFdRwV5Xq',

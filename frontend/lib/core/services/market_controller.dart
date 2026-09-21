@@ -46,6 +46,10 @@ class MarketController extends ChangeNotifier {
       status = await _service.getStatus();
       final latest = await _service.getQuotes();
       for (final quote in latest) {
+        final existing = quotes[quote.asset];
+        if (existing != null && !quote.timestamp.isAfter(existing.timestamp)) {
+          continue;
+        }
         quotes[quote.asset] = quote;
         final trail = priceTrail.putIfAbsent(quote.asset, () => []);
         if (trail.isEmpty || trail.last != quote.price) {
@@ -121,8 +125,13 @@ class MarketController extends ChangeNotifier {
 
   void _applyLivePrice(String asset, double price, DateTime? timestamp) {
     if (asset != focusedAsset || candles.isEmpty) return;
-    final stamp = timestamp ?? DateTime.now().toUtc();
     final last = candles.last;
+    if (!last.closed &&
+        timestamp != null &&
+        timestamp.isBefore(last.closeTime.toUtc())) {
+      return;
+    }
+    final stamp = timestamp ?? DateTime.now().toUtc();
     final bucket = DateTime.utc(
       stamp.year,
       stamp.month,

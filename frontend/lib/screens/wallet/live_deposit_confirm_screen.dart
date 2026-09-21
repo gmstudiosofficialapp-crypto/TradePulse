@@ -118,25 +118,50 @@ class _LiveDepositConfirmScreenState extends State<LiveDepositConfirmScreen> {
                             color: Theme.of(context).colorScheme.onSurface,
                           ),
                     ),
-                    const SizedBox(height: 20),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 16),
+              PremiumCard(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
                     Text('Deposit Address', style: _labelStyle(context)),
                     const SizedBox(height: 6),
+                    Text(
+                      asset.depositNetworkLabel,
+                      style: TextStyle(
+                        color: colors.mutedText,
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    const SizedBox(height: 12),
                     SelectableText(
                       asset.placeholderAddress,
-                      style: const TextStyle(fontWeight: FontWeight.w700),
+                      style: const TextStyle(
+                        fontFamily: 'monospace',
+                        fontSize: 13,
+                        height: 1.45,
+                        fontWeight: FontWeight.w600,
+                      ),
                     ),
                     const SizedBox(height: 14),
-                    OutlinedButton.icon(
-                      onPressed: _copy,
-                      icon: const Icon(Icons.copy, size: 16),
-                      label: const Text('Copy Address'),
+                    SizedBox(
+                      width: double.infinity,
+                      child: OutlinedButton.icon(
+                        onPressed: _copy,
+                        icon: const Icon(Icons.copy, size: 16),
+                        label: const Text('Copy Address'),
+                      ),
                     ),
                   ],
                 ),
               ),
-              const SizedBox(height: 18),
+              const SizedBox(height: 16),
               AppTextField(
                 label: 'Transaction ID / TXID',
+                hintText: 'Enter your transaction ID / TXID',
                 controller: _txid,
               ),
               const SizedBox(height: 18),
@@ -148,6 +173,30 @@ class _LiveDepositConfirmScreenState extends State<LiveDepositConfirmScreen> {
                 label: 'Submit Deposit',
                 loading: _loading,
                 onPressed: _loading ? null : _submit,
+              ),
+              const SizedBox(height: 16),
+              PremiumCard(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('Payment Notice', style: _labelStyle(context)),
+                    const SizedBox(height: 8),
+                    Text(
+                      'Please send the exact deposit amount to the provided payment address. After completing your payment, enter the correct transaction ID (TXID) below and submit your deposit request.',
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                            height: 1.45,
+                          ),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      'Please make sure the payment amount, network, and TXID are correct before submitting.',
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                            height: 1.45,
+                            color: colors.mutedText,
+                          ),
+                    ),
+                  ],
+                ),
               ),
               const SizedBox(height: 12),
               Text(

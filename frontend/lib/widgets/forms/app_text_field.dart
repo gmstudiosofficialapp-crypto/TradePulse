@@ -5,6 +5,7 @@ class AppTextField extends StatelessWidget {
     super.key,
     required this.label,
     required this.controller,
+    this.hintText,
     this.keyboardType,
     this.validator,
     this.textInputAction,
@@ -14,6 +15,7 @@ class AppTextField extends StatelessWidget {
 
   final String label;
   final TextEditingController controller;
+  final String? hintText;
   final TextInputType? keyboardType;
   final String? Function(String?)? validator;
   final TextInputAction? textInputAction;
@@ -31,6 +33,7 @@ class AppTextField extends StatelessWidget {
       onFieldSubmitted: onSubmitted,
       decoration: InputDecoration(
         labelText: label,
+        hintText: hintText,
         labelStyle: TextStyle(
           color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.82),
           fontWeight: FontWeight.w600,

@@ -19,6 +19,8 @@ import 'package:tradepulse_frontend/screens/home/home_screen.dart';
 import 'package:tradepulse_frontend/screens/wallet/live_deposit_confirm_screen.dart';
 import 'package:tradepulse_frontend/screens/wallet/live_deposit_screen.dart';
 import 'package:tradepulse_frontend/screens/wallet/live_withdraw_screen.dart';
+import 'package:tradepulse_frontend/core/services/pwa_install_bridge_stub.dart';
+import 'package:tradepulse_frontend/core/services/pwa_install_controller.dart';
 import 'package:tradepulse_frontend/widgets/layout/viewport_sync.dart';
 import 'package:tradepulse_frontend/widgets/cards/demo_balance_card.dart';
 
@@ -32,6 +34,7 @@ Widget _app({
   required Widget home,
   LiveWalletController? wallet,
   TradingController? trading,
+  PwaInstallController? pwa,
 }) {
   final market = MarketController(OfflineMarketDataService());
   return MaterialApp(
@@ -52,7 +55,10 @@ Widget _app({
                   (TradingController(_SilentTrading())..balance = 10000),
               child: LiveWalletScope(
                 wallet: wallet ?? LiveWalletController(),
-                child: child ?? const SizedBox.shrink(),
+                child: PwaInstallScope(
+                  install: pwa ?? PwaInstallController(),
+                  child: child ?? const SizedBox.shrink(),
+                ),
               ),
             ),
           ),
@@ -72,6 +78,11 @@ Future<AuthController> _auth(WidgetTester tester) async {
     );
     return AuthController(service);
   }))!;
+}
+
+Future<void> _tallSurface(WidgetTester tester) async {
+  await tester.binding.setSurfaceSize(const Size(400, 1400));
+  addTearDown(() => tester.binding.setSurfaceSize(null));
 }
 
 void main() {
@@ -193,6 +204,7 @@ void main() {
   });
 
   testWidgets('home shows demo balance, live zero, and cash buttons', (tester) async {
+    await _tallSurface(tester);
     final auth = await _auth(tester);
     final trading = TradingController(_SilentTrading())..balance = 12500;
     await tester.pumpWidget(
@@ -201,16 +213,62 @@ void main() {
     await tester.pump();
     expect(find.text('Demo Balance'), findsOneWidget);
     expect(find.text(r'$12,500.00'), findsOneWidget);
+    expect(find.text('OTC Trading Platform'), findsOneWidget);
+    expect(find.text('Fast • Simple • Trading'), findsOneWidget);
+    expect(find.text('Manage Funds'), findsOneWidget);
     expect(find.text('Live Balance'), findsOneWidget);
     expect(find.text(r'$0.00'), findsWidgets);
     expect(find.text('Deposit'), findsOneWidget);
     expect(find.text('Withdraw'), findsOneWidget);
+    expect(find.text('Install TradePulse'), findsNothing);
+  });
+
+  testWidgets('home footer shows Android install option', (tester) async {
+    await _tallSurface(tester);
+    final auth = await _auth(tester);
+    final pwa = PwaInstallController(
+      bridge: StubPwaInstallBridge()..nativePrompt = true,
+    );
+    await tester.pumpWidget(
+      _app(auth: auth, home: const HomeScreen(), pwa: pwa),
+    );
+    await tester.pump();
+    await tester.scrollUntilVisible(
+      find.text('Install Now'),
+      240,
+      scrollable: find.byType(Scrollable).first,
+    );
+    expect(find.text('Install TradePulse'), findsOneWidget);
+    expect(find.text('Install Now'), findsOneWidget);
+  });
+
+  testWidgets('home footer shows iPhone Add to Home Screen', (tester) async {
+    await _tallSurface(tester);
+    final auth = await _auth(tester);
+    final pwa = PwaInstallController(
+      bridge: StubPwaInstallBridge()..iosBrowser = true,
+    );
+    await tester.pumpWidget(
+      _app(auth: auth, home: const HomeScreen(), pwa: pwa),
+    );
+    await tester.pump();
+    await tester.scrollUntilVisible(
+      find.text('Add to Home Screen'),
+      240,
+      scrollable: find.byType(Scrollable).first,
+    );
+    expect(
+      find.text('Add TradePulse to your Home Screen for faster access.'),
+      findsOneWidget,
+    );
   });
 
   testWidgets('deposit and withdraw buttons open live screens', (tester) async {
+    await _tallSurface(tester);
     final auth = await _auth(tester);
     await tester.pumpWidget(_app(auth: auth, home: const HomeScreen()));
     await tester.pump();
+    await tester.ensureVisible(find.text('Deposit'));
     await tester.tap(find.text('Deposit'));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 400));
@@ -218,12 +276,13 @@ void main() {
     await tester.pageBack();
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 400));
+    await tester.ensureVisible(find.text('Withdraw'));
     await tester.tap(find.text('Withdraw'));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 400));
     expect(find.text('Insufficient Balance'), findsOneWidget);
     expect(
-      find.text('আপনার Withdraw করার জন্য পর্যাপ্ত Live Balance নেই।'),
+      find.text('You do not have sufficient Live Balance to make a withdrawal.'),
       findsOneWidget,
     );
   });
@@ -313,6 +372,7 @@ void main() {
   });
 
   testWidgets('confirm deposit shows the selected draft amount', (tester) async {
+    await _tallSurface(tester);
     final auth = await _auth(tester);
     await tester.pumpWidget(
       _app(
@@ -331,7 +391,9 @@ void main() {
     expect(find.text('Bitcoin (BTC)'), findsOneWidget);
     expect(find.text('Deposit Amount'), findsOneWidget);
     expect(find.text(r'$2,500.00'), findsOneWidget);
+    expect(find.text('Bitcoin Network'), findsOneWidget);
     expect(find.text('1CUXN4MrQ9qyZBtqU6Pg4U7iZiy6Y3ztMt'), findsOneWidget);
+    expect(find.text('Payment Notice'), findsOneWidget);
     expect(LiveWalletController.liveBalance, 0);
   });
 
@@ -339,8 +401,10 @@ void main() {
     final auth = await _auth(tester);
     await tester.pumpWidget(_app(auth: auth, home: const LiveWithdrawScreen()));
     await tester.pump();
-    expect(find.text(r'$0.00'), findsOneWidget);
+    expect(find.text(r'$0.00'), findsWidgets);
     expect(find.text('Insufficient Balance'), findsOneWidget);
+    expect(find.text('Withdrawal Information'), findsOneWidget);
+    expect(find.text('Unavailable'), findsOneWidget);
     final button = tester.widget<FilledButton>(find.widgetWithText(FilledButton, 'Withdraw'));
     expect(button.onPressed, isNull);
   });

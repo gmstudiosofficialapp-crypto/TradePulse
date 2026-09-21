@@ -24,7 +24,6 @@ import 'core/services/websocket_market_data_service.dart';
 import 'core/theme/app_theme.dart';
 import 'core/utils/password_reset_link.dart';
 import 'widgets/layout/viewport_sync.dart';
-import 'widgets/pwa/pwa_install_banner.dart';
 import 'firebase_options.dart';
 
 Future<void> main() async {
@@ -157,12 +156,7 @@ class _TradePulseAppState extends State<TradePulseApp> {
                     wallet: _wallet,
                     child: PwaInstallScope(
                       install: _pwa,
-                      child: Stack(
-                        children: [
-                          child ?? const SizedBox.shrink(),
-                          const PwaInstallBanner(),
-                        ],
-                      ),
+                      child: child ?? const SizedBox.shrink(),
                     ),
                   ),
                 ),
