@@ -18,6 +18,7 @@ if str(ROOT) not in sys.path:
 
 from app.api.market import router as market_router
 from app.api.private import router as private_router
+from app.api.signal import router as signal_router
 from app.api.trading import router as trading_router
 from app.api.ws import attach_hub, router as ws_router
 from app.core.admin_config import AdminMarketControl
@@ -100,6 +101,7 @@ def create_app(
     application.include_router(market_router)
     application.include_router(trading_router)
     application.include_router(private_router)
+    application.include_router(signal_router)
     application.include_router(ws_router)
 
     @application.get("/health")

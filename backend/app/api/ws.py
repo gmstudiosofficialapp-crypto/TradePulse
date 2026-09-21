@@ -27,6 +27,9 @@ def attach_hub() -> MarketHub:
     coordinator.add_event_handler(_on_phase3_event)
     coordinator.enable_live()
     runtime.add_handler(coordinator.on_market)
+    from app.api.signal import attach_signal_feed
+
+    attach_signal_feed()
     return hub
 
 

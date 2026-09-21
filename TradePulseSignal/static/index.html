@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>TradePulseSignal BTC feed</title>
+  <style>
+    body { font-family: sans-serif; background: #111; color: #eee; margin: 24px; }
+    pre { background: #1c1c1c; padding: 12px; overflow: auto; }
+    .ok { color: #7dcea0; }
+    .bad { color: #f1948a; }
+    label { display: block; margin: 8px 0 4px; }
+    input { width: 420px; max-width: 100%; }
+  </style>
+</head>
+<body>
+  <h1>TradePulseSignal — BTC future book</h1>
+  <p>Developer / research view. No BUY/SELL logic.</p>
+  <label>TradePulse base URL</label>
+  <input id="base" />
+  <label>Firebase ID token (not stored in source)</label>
+  <input id="token" type="password" />
+  <p>
+    <button id="connect">Connect</button>
+    <button id="disconnect">Disconnect</button>
+  </p>
+  <p>Connection: <strong id="status" class="bad">DISCONNECTED</strong></p>
+  <p>Last update: <span id="updated">—</span></p>
+  <p>Event: <span id="event">—</span></p>
+  <h2>BTC/USD-OTC</h2>
+  <h3>LIVE</h3>
+  <pre id="live">—</pre>
+  <h3>NEXT 1</h3>
+  <pre id="f1">—</pre>
+  <h3>NEXT 2</h3>
+  <pre id="f2">—</pre>
+  <h3>NEXT 3</h3>
+  <pre id="f3">—</pre>
+  <script>
+    const statusEl = document.getElementById("status");
+    const updatedEl = document.getElementById("updated");
+    const eventEl = document.getElementById("event");
+    const liveEl = document.getElementById("live");
+    const slots = [document.getElementById("f1"), document.getElementById("f2"), document.getElementById("f3")];
+    let socket = null;
+    let lastSequence = 0;
+    let attempt = 0;
+    let stopped = true;
+
+    function setStatus(ok, text) {
+      statusEl.textContent = text;
+      statusEl.className = ok ? "ok" : "bad";
+    }
+    function showCandle(el, candle) {
+      if (!candle) { el.textContent = "—"; return; }
+      el.textContent =
+        candle.candle_start_time + " → " + candle.candle_end_time + "\n" +
+        "O " + candle.open + "  H " + candle.high + "  L " + candle.low + "  C " + candle.close + "\n" +
+        "direction " + candle.direction + "  id " + candle.id;
+    }
+    function apply(msg) {
+      if (!msg || msg.schema_version !== 1 || msg.asset !== "BTC/USD-OTC") return;
+      if (!Array.isArray(msg.futures) || msg.futures.length !== 3) return;
+      const seq = Number(msg.sequence || 0);
+      if (msg.type !== "snapshot" && seq <= lastSequence) return;
+      lastSequence = Math.max(lastSequence, seq);
+      liveEl && showCandle(liveEl, msg.live);
+      msg.futures.forEach((item, i) => showCandle(slots[i], item));
+      updatedEl.textContent = msg.generated_at || new Date().toISOString();
+      eventEl.textContent = msg.type || "—";
+    }
+    function wsUrl(base) {
+      return base.replace(/^http/, "ws") + "/ws/signal-btc-future";
+    }
+    async function snapshot(base, token) {
+      const res = await fetch(base + "/api/signal/btc-future-book", {
+        headers: { Authorization: "Bearer " + token }
+      });
+      if (!res.ok) throw new Error("snapshot " + res.status);
+      const body = await res.json();
+      apply(body);
+    }
+    function delay(ms) { return new Promise((r) => setTimeout(r, ms)); }
+    async function openSocket(base, token) {
+      await new Promise((resolve, reject) => {
+        socket = new WebSocket(wsUrl(base));
+        socket.onopen = () => {
+          socket.send(JSON.stringify({ type: "auth", token: token }));
+        };
+        socket.onmessage = (ev) => {
+          const msg = JSON.parse(ev.data);
+          if (msg.type === "authenticated") {
+            socket.send(JSON.stringify({ type: "subscribe" }));
+            setStatus(true, "CONNECTED");
+            attempt = 0;
+            resolve();
+            return;
+          }
+          apply(msg);
+        };
+        socket.onerror = () => reject(new Error("ws error"));
+        socket.onclose = () => {
+          setStatus(false, "DISCONNECTED");
+          if (!stopped) reconnect(base, token);
+          reject(new Error("ws closed"));
+        };
+      });
+    }
+    async function reconnect(base, token) {
+      const waits = [1000, 2000, 5000, 15000];
+      const wait = waits[Math.min(attempt, waits.length - 1)];
+      attempt += 1;
+      await delay(wait);
+      if (stopped) return;
+      try {
+        await snapshot(base, token);
+        await openSocket(base, token);
+      } catch (err) {
+        eventEl.textContent = String(err);
+        if (!stopped) reconnect(base, token);
+      }
+    }
+    document.getElementById("connect").onclick = async () => {
+      const base = document.getElementById("base").value.replace(/\/$/, "");
+      const token = document.getElementById("token").value.trim();
+      stopped = false;
+      lastSequence = 0;
+      try {
+        await snapshot(base, token);
+        await openSocket(base, token);
+      } catch (err) {
+        setStatus(false, "DISCONNECTED");
+        eventEl.textContent = String(err);
+      }
+    };
+    document.getElementById("disconnect").onclick = () => {
+      stopped = true;
+      if (socket) socket.close();
+      setStatus(false, "DISCONNECTED");
+    };
+    fetch("/config").then((r) => r.json()).then((cfg) => {
+      document.getElementById("base").value = cfg.tradepulse_base_url;
+    }).catch(() => {
+      document.getElementById("base").value = "http://127.0.0.1:8000";
+    });
+  </script>
+</body>
+</html>
