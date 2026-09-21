@@ -92,3 +92,14 @@ def test_demo_trade_api_uses_server_price() -> None:
         assert private.status_code == 200
         public_signal = client.get("/api/signals/latest", params={"asset": "BTC/USD-OTC"})
         assert "reference_direction" not in public_signal.json()
+        futures = client.get("/api/private/btc-future-candles")
+        assert futures.status_code == 200
+        body = futures.json()
+        assert body["asset"] == "BTC/USD-OTC"
+        assert body["rolling"] is True
+        assert body["future_count"] == 3
+        assert len(body["futures"]) == 3
+        public_quote = client.get("/api/market/quotes")
+        text = str(public_quote.json())
+        assert "precomputed" not in text
+        assert "candle_start_time" not in text

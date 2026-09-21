@@ -4,6 +4,8 @@ void pinHost() {}
 
 double? windowInnerHeight() => null;
 
+double? largeViewportHeight() => null;
+
 double? layoutHeight() => null;
 
 double keyboardOverlap() => 0;

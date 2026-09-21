@@ -45,19 +45,14 @@ class _ViewportSyncState extends State<ViewportSync> with WidgetsBindingObserver
   @override
   Widget build(BuildContext context) {
     final media = MediaQuery.of(context);
-    final focused = FocusManager.instance.primaryFocus?.hasFocus ?? false;
     final overlap = metrics.keyboardOverlap();
-    final browserH = metrics.layoutHeight() ?? metrics.windowInnerHeight();
-    final restored =
-        browserH != null && browserH > media.size.height + 40;
+    final focused = FocusManager.instance.primaryFocus?.hasFocus ?? false;
+    final browserHeight = metrics.layoutHeight() ?? metrics.windowInnerHeight();
+    final hasBrowser = browserHeight != null;
     final visualOpen = overlap > 80;
     final flutterOpen = media.viewInsets.bottom > 80 && focused;
-    final keyboardOpen = !restored && (visualOpen || flutterOpen);
-    final height = restored
-        ? browserH
-        : keyboardOpen
-            ? media.size.height
-            : math.max(media.size.height, browserH ?? media.size.height);
+    final keyboardOpen = visualOpen || (!hasBrowser && flutterOpen);
+    final height = math.max(media.size.height, browserHeight ?? media.size.height);
     final inset = keyboardOpen
         ? math.max(media.viewInsets.bottom, overlap)
         : 0.0;

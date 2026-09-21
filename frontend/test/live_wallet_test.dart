@@ -116,6 +116,31 @@ void main() {
     expect(seen.size.height, 844);
   });
 
+  testWidgets('focused field keeps full height and keyboard insets', (tester) async {
+    late MediaQueryData seen;
+    await tester.pumpWidget(
+      MediaQuery(
+        data: const MediaQueryData(
+          size: Size(390, 844),
+          viewInsets: EdgeInsets.only(bottom: 320),
+        ),
+        child: ViewportSync(
+          child: MaterialApp(
+            home: Builder(
+              builder: (context) {
+                seen = MediaQuery.of(context);
+                return const Scaffold(body: TextField(autofocus: true));
+              },
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pump();
+    expect(seen.size.height, 844);
+    expect(seen.viewInsets.bottom, greaterThan(80));
+  });
+
   test('live deposit amount bounds', () {
     expect(Validators.liveDepositAmount('49.99'), isNotNull);
     expect(Validators.liveDepositAmount('50'), isNull);

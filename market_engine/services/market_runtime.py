@@ -10,6 +10,11 @@ from market_engine.config.assets import ASSET_CONFIGS, AssetConfig, enabled_asse
 from market_engine.config.settings import EngineSettings
 from market_engine.models.candle import Candle
 from market_engine.models.tick import Tick
+from market_engine.services.btc_future_book import (
+    BTC_SYMBOL,
+    BtcFutureBook,
+    due_live_stamps,
+)
 from market_engine.services.candle_engine import CandleEngine, minute_floor_utc
 from market_engine.services.candle_store import CandleStore, MemoryCandleStore
 from market_engine.services.tick_engine import TickEngine
@@ -55,6 +60,7 @@ class MarketRuntime:
         self.quotes: dict[str, Tick] = {}
         self.open_candles: dict[str, Candle] = {}
         self.session_open: dict[str, float] = {}
+        self.btc_future_book = BtcFutureBook()
 
     def add_handler(self, handler: TickHandler) -> None:
         if handler not in self._handlers:
@@ -115,18 +121,42 @@ class MarketRuntime:
             self.quotes[stream.config.symbol] = seed_tick
             self.open_candles[stream.config.symbol] = current
             self.session_open.setdefault(stream.config.symbol, seed_tick.price)
+            if stream.config.symbol == BTC_SYMBOL:
+                self.btc_future_book.sync(stream, moment)
+
+    def btc_future_snapshot(self) -> dict:
+        return self.btc_future_book.snapshot(self.open_candles.get(BTC_SYMBOL))
+
+    def _advance(self, stream: AssetStream, timestamp: datetime) -> MarketEvent:
+        tick = stream.ticks.next_tick(timestamp)
+        closed, current = stream.candles.apply_tick(tick)
+        if closed is not None:
+            self.store.append(closed)
+        self.quotes[stream.config.symbol] = tick
+        self.open_candles[stream.config.symbol] = current
+        self.session_open.setdefault(stream.config.symbol, tick.price)
+        if stream.config.symbol == BTC_SYMBOL:
+            self.btc_future_book.sync(stream, tick.timestamp, closed)
+        return MarketEvent(tick=tick, candle=current, closed=closed)
 
     def step(self, timestamp: datetime | None = None) -> list[MarketEvent]:
+        now = timestamp or datetime.now(timezone.utc)
+        if now.tzinfo is None:
+            now = now.replace(tzinfo=timezone.utc)
+        else:
+            now = now.astimezone(timezone.utc)
         events: list[MarketEvent] = []
         for stream in self.streams.values():
-            tick = stream.ticks.next_tick(timestamp)
-            closed, current = stream.candles.apply_tick(tick)
-            if closed is not None:
-                self.store.append(closed)
-            self.quotes[stream.config.symbol] = tick
-            self.open_candles[stream.config.symbol] = current
-            self.session_open.setdefault(stream.config.symbol, tick.price)
-            events.append(MarketEvent(tick=tick, candle=current, closed=closed))
+            if stream.config.symbol == BTC_SYMBOL:
+                stamps = due_live_stamps(
+                    stream.candles.current,
+                    now,
+                    stream.config.tick_interval_ms,
+                )
+                for stamp in stamps:
+                    events.append(self._advance(stream, stamp))
+                continue
+            events.append(self._advance(stream, now))
         return events
 
     async def start(self) -> None:
@@ -154,7 +184,8 @@ class MarketRuntime:
         )
         delay = max(interval / 1000, 0.05)
         while self.running:
-            for event in self.step():
+            now = datetime.now(timezone.utc)
+            for event in self.step(now):
                 for handler in self._handlers:
                     result = handler(event.tick, event.candle, event.closed)
                     if asyncio.iscoroutine(result):
