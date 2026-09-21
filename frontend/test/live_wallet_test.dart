@@ -141,6 +141,31 @@ void main() {
     expect(seen.viewInsets.bottom, greaterThan(80));
   });
 
+  testWidgets('shrunk engine height restores after keyboard', (tester) async {
+    late MediaQueryData seen;
+    Future<void> pumpSize(Size size) {
+      return tester.pumpWidget(
+        MediaQuery(
+          data: MediaQueryData(size: size),
+          child: ViewportSync(
+            child: Builder(
+              builder: (context) {
+                seen = MediaQuery.of(context);
+                return const SizedBox.shrink();
+              },
+            ),
+          ),
+        ),
+      );
+    }
+
+    await pumpSize(const Size(390, 844));
+    expect(seen.size.height, 844);
+    await pumpSize(const Size(390, 524));
+    expect(seen.size.height, 844);
+    expect(seen.viewInsets.bottom, 0);
+  });
+
   test('live deposit amount bounds', () {
     expect(Validators.liveDepositAmount('49.99'), isNotNull);
     expect(Validators.liveDepositAmount('50'), isNull);

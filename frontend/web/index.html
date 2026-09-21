@@ -42,15 +42,80 @@
       margin: 0;
       padding: 0;
       width: 100%;
-      height: 100%;
-      min-height: 100lvh;
+      height: var(--tp-app-height, 100lvh);
+      min-height: var(--tp-app-height, 100lvh);
       overflow: hidden;
       background-color: #0B1730;
+    }
+    flutter-view, flt-glass-pane {
+      width: 100% !important;
+      height: 100% !important;
+      min-height: 100% !important;
+      max-height: none !important;
     }
   </style>
 </head>
 <body>
   <script>
+    (function () {
+      var baseline = Math.max(window.innerHeight || 0, document.documentElement.clientHeight || 0);
+      var landscape = window.innerWidth > window.innerHeight;
+      function visualHeight() {
+        var viewport = window.visualViewport;
+        if (!viewport) return window.innerHeight || 0;
+        return viewport.height + viewport.offsetTop;
+      }
+      function apply() {
+        document.documentElement.style.setProperty(
+          '--tp-app-height',
+          Math.round(baseline) + 'px'
+        );
+      }
+      function overlap() {
+        return Math.max(0, baseline - visualHeight());
+      }
+      window.__tpLayoutHeight = function () { return baseline; };
+      window.__tpKeyboardOverlap = function () { return overlap(); };
+      window.__tpSyncViewport = function () {
+        var nowLandscape = window.innerWidth > window.innerHeight;
+        if (nowLandscape !== landscape) {
+          landscape = nowLandscape;
+          baseline = Math.max(window.innerHeight || 0, document.documentElement.clientHeight || 0);
+        }
+        var visible = visualHeight();
+        var open = baseline - visible > 80;
+        if (!open) {
+          var measured = Math.max(window.innerHeight || 0, document.documentElement.clientHeight || 0, visible);
+          if (measured > baseline) baseline = measured;
+          window.scrollTo(0, 0);
+        }
+        apply();
+        return baseline;
+      };
+      window.__tpReleaseKeyboard = function () {
+        var visible = visualHeight();
+        if (baseline - visible > 40) return;
+        var active = document.activeElement;
+        if (active && active !== document.body && active.blur) {
+          active.blur();
+        }
+        window.scrollTo(0, 0);
+        window.__tpSyncViewport();
+      };
+      apply();
+      window.addEventListener('resize', window.__tpSyncViewport);
+      window.addEventListener('orientationchange', window.__tpSyncViewport);
+      window.addEventListener('pageshow', window.__tpSyncViewport);
+      if (window.visualViewport) {
+        window.visualViewport.addEventListener('resize', function () {
+          var visible = visualHeight();
+          if (visible >= baseline - 40) {
+            window.__tpReleaseKeyboard();
+          }
+          window.__tpSyncViewport();
+        });
+      }
+    })();
     window.__tpInstallPrompt = null;
     window.__tpTakeInstallPrompt = function () {
       var prompt = window.__tpInstallPrompt;
