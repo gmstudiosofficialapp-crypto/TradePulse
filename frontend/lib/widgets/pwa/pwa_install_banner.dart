@@ -16,6 +16,7 @@ class PwaInstallBanner extends StatelessWidget {
 
     final colors = context.tpColors;
     final ios = install.surface == PwaInstallSurface.ios;
+    final android = install.surface == PwaInstallSurface.android;
     final scheme = Theme.of(context).colorScheme;
 
     return Padding(
@@ -52,7 +53,9 @@ class PwaInstallBanner extends StatelessWidget {
                         Text(
                           ios
                               ? 'Add TradePulse to your Home Screen for faster access.'
-                              : 'Install the app for faster access to your account.',
+                              : android
+                                  ? 'Add TradePulse to your Home Screen from the Chrome menu.'
+                                  : 'Install the app for faster access to your account.',
                           style: Theme.of(context).textTheme.bodySmall?.copyWith(
                                 color: colors.mutedText,
                                 height: 1.3,
@@ -77,7 +80,7 @@ class PwaInstallBanner extends StatelessWidget {
               Align(
                 alignment: Alignment.centerRight,
                 child: FilledButton(
-                  onPressed: ios
+                  onPressed: ios || android
                       ? install.openIosGuide
                       : () {
                           install.installNow();
@@ -88,15 +91,21 @@ class PwaInstallBanner extends StatelessWidget {
                     visualDensity: VisualDensity.compact,
                     padding: const EdgeInsets.symmetric(horizontal: 14),
                   ),
-                  child: Text(ios ? 'Add to Home Screen' : 'Install Now'),
+                  child: Text(
+                    ios || android ? 'Add to Home Screen' : 'Install Now',
+                  ),
                 ),
               ),
-              if (ios && install.iosGuideOpen) ...[
+              if ((ios || android) && install.iosGuideOpen) ...[
                 const SizedBox(height: 10),
                 Text(
-                  '1. Tap the Share button in Safari\n'
-                  '2. Select “Add to Home Screen”\n'
-                  '3. Tap “Add”',
+                  ios
+                      ? '1. Tap the Share button in Safari\n'
+                          '2. Select “Add to Home Screen”\n'
+                          '3. Tap “Add”'
+                      : '1. Tap the Chrome menu (⋮)\n'
+                          '2. Tap Install app or Add to Home screen\n'
+                          '3. Tap Install',
                   style: Theme.of(context).textTheme.bodySmall?.copyWith(
                         color: scheme.onSurface,
                         height: 1.45,

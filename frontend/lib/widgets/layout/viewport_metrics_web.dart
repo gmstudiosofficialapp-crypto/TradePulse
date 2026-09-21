@@ -1,8 +1,12 @@
 import 'dart:js_interop';
+import 'dart:math' as math;
 
 import 'package:web/web.dart' as web;
 
 const _probeId = 'tp-lvh-probe';
+
+double _tallest = 0;
+int _orientation = -1;
 
 void Function()? listenViewport(void Function() onChange) {
   void notify() => onChange();
@@ -45,7 +49,8 @@ void pinHost() {
     body.style.top = '0px';
     body.style.left = '0px';
     body.style.right = '0px';
-    body.style.bottom = 'auto';
+    body.style.removeProperty('bottom');
+    body.style.removeProperty('inset');
     body.style.overflow = 'hidden';
   }
   for (final selector in ['flutter-view', 'flt-glass-pane']) {
@@ -81,16 +86,28 @@ double? largeViewportHeight() {
   return height > 0 ? height : null;
 }
 
-double? layoutHeight() {
-  final client = web.document.documentElement?.clientHeight.toDouble();
-  final inner = windowInnerHeight();
-  final visual = web.window.visualViewport;
-  final visualExtent = visual == null
-      ? null
-      : visual.height + visual.offsetTop;
-  final lvh = largeViewportHeight();
+double? screenAvailHeight() {
+  if (web.window.navigator.maxTouchPoints < 1) return null;
+  final avail = web.window.screen.availHeight.toDouble();
+  final height = web.window.screen.height.toDouble();
+  final outer = web.window.outerHeight.toDouble();
   var best = 0.0;
-  for (final value in [client, inner, visualExtent, lvh]) {
+  for (final value in [avail, height, outer]) {
+    if (value > best) best = value;
+  }
+  return best > 0 ? best : null;
+}
+
+double? layoutHeight() {
+  _rememberClosedHeight();
+  var best = 0.0;
+  for (final value in [
+    windowInnerHeight(),
+    web.document.documentElement?.clientHeight.toDouble(),
+    largeViewportHeight(),
+    screenAvailHeight(),
+    _tallest > 0 ? _tallest : null,
+  ]) {
     if (value != null && value > best) best = value;
   }
   return best > 0 ? best : null;
@@ -100,25 +117,35 @@ double keyboardOverlap() {
   final viewport = web.window.visualViewport;
   if (viewport == null) return 0;
   final inner = web.window.innerHeight.toDouble();
-  final innerOverlap = inner - viewport.height - viewport.offsetTop;
-  if (innerOverlap > 80) return innerOverlap;
-  final lvh = largeViewportHeight();
-  if (lvh == null) return 0;
-  final largeOverlap = lvh - viewport.height - viewport.offsetTop;
-  if (largeOverlap <= 80) return 0;
-  final active = web.document.activeElement;
-  if (active == null) return 0;
-  final tag = active.tagName.toLowerCase();
-  final typing = tag == 'input' || tag == 'textarea' || tag == 'select';
-  return typing ? largeOverlap : 0;
+  final overlay = inner - viewport.height - viewport.offsetTop;
+  return overlay > 0 ? overlay : 0;
 }
 
 bool visualKeyboardOpen() => keyboardOverlap() > 80;
+
+void _rememberClosedHeight() {
+  final portrait = web.window.innerWidth <= web.window.innerHeight ? 0 : 1;
+  if (_orientation != portrait) {
+    _orientation = portrait;
+    _tallest = 0;
+  }
+  if (keyboardOverlap() > 80) return;
+  for (final value in [
+    windowInnerHeight(),
+    web.document.documentElement?.clientHeight.toDouble(),
+    largeViewportHeight(),
+    screenAvailHeight(),
+  ]) {
+    if (value != null) {
+      _tallest = math.max(_tallest, value);
+    }
+  }
+}
 
 void _pinBox(web.HTMLElement element, String px) {
   final style = element.style;
   style.width = '100%';
   style.height = px;
   style.setProperty('min-height', px);
-  style.setProperty('max-height', px);
+  style.removeProperty('max-height');
 }

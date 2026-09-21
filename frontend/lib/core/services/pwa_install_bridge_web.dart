@@ -8,6 +8,9 @@ const _dismissKey = 'tradepulse.pwa.bannerDismissed';
 
 PwaInstallBridge createBridge() => WebPwaInstallBridge();
 
+@JS('__tpTakeInstallPrompt')
+external JSAny? _takeInstallPrompt();
+
 extension type _BeforeInstallPromptEvent._(web.Event _) implements web.Event {
   external JSPromise<JSAny?> prompt();
 }
@@ -20,6 +23,7 @@ class WebPwaInstallBridge implements PwaInstallBridge {
   bool _appInstalled = false;
   JSFunction? _onBeforeInstall;
   JSFunction? _onAppInstalled;
+  JSFunction? _onEarlyReady;
   void Function()? _listener;
 
   @override
@@ -39,6 +43,12 @@ class WebPwaInstallBridge implements PwaInstallBridge {
   bool get isIosBrowser => _detectIos() && !isStandalone;
 
   @override
+  bool get isAndroidBrowser {
+    if (isStandalone || isIosBrowser) return false;
+    return web.window.navigator.userAgent.contains('Android');
+  }
+
+  @override
   bool get sessionDismissed =>
       web.window.sessionStorage.getItem(_dismissKey) == '1';
 
@@ -55,8 +65,13 @@ class WebPwaInstallBridge implements PwaInstallBridge {
       _appInstalled = true;
       _listener?.call();
     }).toJS;
+    _onEarlyReady ??= ((web.Event _) {
+      _adoptEarlyPrompt();
+    }).toJS;
     web.window.addEventListener('beforeinstallprompt', _onBeforeInstall!);
     web.window.addEventListener('appinstalled', _onAppInstalled!);
+    web.window.addEventListener('tp-install-ready', _onEarlyReady!);
+    _adoptEarlyPrompt();
   }
 
   @override
@@ -66,6 +81,9 @@ class WebPwaInstallBridge implements PwaInstallBridge {
     }
     if (_onAppInstalled != null) {
       web.window.removeEventListener('appinstalled', _onAppInstalled!);
+    }
+    if (_onEarlyReady != null) {
+      web.window.removeEventListener('tp-install-ready', _onEarlyReady!);
     }
     _listener = null;
   }
@@ -87,6 +105,16 @@ class WebPwaInstallBridge implements PwaInstallBridge {
     } catch (_) {
       return PwaPromptOutcome.unavailable;
     }
+  }
+
+  void _adoptEarlyPrompt() {
+    if (_deferred != null) return;
+    try {
+      final raw = _takeInstallPrompt();
+      if (raw == null) return;
+      _deferred = _BeforeInstallPromptEvent._(raw as web.Event);
+      _listener?.call();
+    } catch (_) {}
   }
 
   bool _detectIos() {

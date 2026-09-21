@@ -267,6 +267,26 @@ void main() {
     expect(find.text('Install Now'), findsOneWidget);
   });
 
+  testWidgets('home footer shows Android install without native prompt',
+      (tester) async {
+    await _tallSurface(tester);
+    final auth = await _auth(tester);
+    final pwa = PwaInstallController(
+      bridge: StubPwaInstallBridge()..androidBrowser = true,
+    );
+    await tester.pumpWidget(
+      _app(auth: auth, home: const HomeScreen(), pwa: pwa),
+    );
+    await tester.pump();
+    await tester.scrollUntilVisible(
+      find.text('Add to Home Screen'),
+      240,
+      scrollable: find.byType(Scrollable).first,
+    );
+    expect(find.text('Install TradePulse'), findsOneWidget);
+    expect(find.text('Add to Home Screen'), findsOneWidget);
+  });
+
   testWidgets('home footer shows iPhone Add to Home Screen', (tester) async {
     await _tallSurface(tester);
     final auth = await _auth(tester);

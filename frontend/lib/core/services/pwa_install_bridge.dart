@@ -7,6 +7,7 @@ abstract class PwaInstallBridge {
   bool get isStandalone;
   bool get canNativePrompt;
   bool get isIosBrowser;
+  bool get isAndroidBrowser;
   bool get sessionDismissed;
 
   void attach(void Function() onChange);

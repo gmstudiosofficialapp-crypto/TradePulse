@@ -2,7 +2,7 @@ import 'package:flutter/foundation.dart';
 
 import 'pwa_install_bridge.dart';
 
-enum PwaInstallSurface { hidden, native, ios }
+enum PwaInstallSurface { hidden, native, ios, android }
 
 class PwaInstallController extends ChangeNotifier {
   PwaInstallController({PwaInstallBridge? bridge})
@@ -22,6 +22,7 @@ class PwaInstallController extends ChangeNotifier {
     }
     if (_bridge.canNativePrompt) return PwaInstallSurface.native;
     if (_bridge.isIosBrowser) return PwaInstallSurface.ios;
+    if (_bridge.isAndroidBrowser) return PwaInstallSurface.android;
     return PwaInstallSurface.hidden;
   }
 
@@ -40,7 +41,10 @@ class PwaInstallController extends ChangeNotifier {
   }
 
   void openIosGuide() {
-    if (surface != PwaInstallSurface.ios) return;
+    if (surface != PwaInstallSurface.ios &&
+        surface != PwaInstallSurface.android) {
+      return;
+    }
     _iosGuideOpen = true;
     notifyListeners();
   }

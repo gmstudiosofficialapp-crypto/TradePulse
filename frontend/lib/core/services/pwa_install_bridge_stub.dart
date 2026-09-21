@@ -6,6 +6,7 @@ class StubPwaInstallBridge implements PwaInstallBridge {
   bool standalone = false;
   bool nativePrompt = false;
   bool iosBrowser = false;
+  bool androidBrowser = false;
   bool dismissed = false;
   int promptCalls = 0;
   PwaPromptOutcome nextOutcome = PwaPromptOutcome.unavailable;
@@ -18,6 +19,9 @@ class StubPwaInstallBridge implements PwaInstallBridge {
 
   @override
   bool get isIosBrowser => iosBrowser && !standalone;
+
+  @override
+  bool get isAndroidBrowser => androidBrowser && !standalone && !iosBrowser;
 
   @override
   bool get sessionDismissed => dismissed;

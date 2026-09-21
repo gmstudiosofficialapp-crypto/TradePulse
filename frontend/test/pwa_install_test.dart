@@ -38,6 +38,8 @@ void main() {
       isTrue,
     );
     expect(html.contains('apple-touch-icon'), isTrue);
+    expect(html.contains('__tpTakeInstallPrompt'), isTrue);
+    expect(html.contains('beforeinstallprompt'), isTrue);
     expect(html.contains('tradepulse_frontend'), isFalse);
   });
 
@@ -67,6 +69,16 @@ void main() {
     expect(controller.iosGuideOpen, isTrue);
   });
 
+  test('Android Chrome shows install banner without a native prompt event',
+      () async {
+    final bridge = StubPwaInstallBridge()..androidBrowser = true;
+    final controller = PwaInstallController(bridge: bridge);
+    expect(controller.surface, PwaInstallSurface.android);
+    expect(controller.shouldShow, isTrue);
+    expect(await controller.installNow(), PwaPromptOutcome.unavailable);
+    expect(bridge.promptCalls, 0);
+  });
+
   testWidgets('Android banner uses native Install Now', (tester) async {
     final bridge = StubPwaInstallBridge()..nativePrompt = true;
     final controller = PwaInstallController(bridge: bridge);
@@ -94,6 +106,22 @@ void main() {
     await tester.pump();
     expect(find.textContaining('Share button'), findsOneWidget);
     expect(find.textContaining('Add to Home Screen'), findsWidgets);
+  });
+
+  testWidgets('Android banner without native prompt still offers Home Screen',
+      (tester) async {
+    final bridge = StubPwaInstallBridge()..androidBrowser = true;
+    final controller = PwaInstallController(bridge: bridge);
+    await tester.pumpWidget(_bannerApp(controller));
+    expect(find.text('Install TradePulse'), findsOneWidget);
+    expect(
+      find.text('Add TradePulse to your Home Screen from the Chrome menu.'),
+      findsOneWidget,
+    );
+    await tester.tap(find.text('Add to Home Screen'));
+    await tester.pump();
+    expect(find.textContaining('Chrome menu'), findsWidgets);
+    expect(bridge.promptCalls, 0);
   });
 
   testWidgets('existing splash still shows TradePulse, not package name',

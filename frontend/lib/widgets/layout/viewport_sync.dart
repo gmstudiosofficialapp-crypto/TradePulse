@@ -49,9 +49,12 @@ class _ViewportSyncState extends State<ViewportSync> with WidgetsBindingObserver
     final focused = FocusManager.instance.primaryFocus?.hasFocus ?? false;
     final browserHeight = metrics.layoutHeight() ?? metrics.windowInnerHeight();
     final hasBrowser = browserHeight != null;
-    final visualOpen = overlap > 80;
+    final overlayOpen = overlap > 80;
     final flutterOpen = media.viewInsets.bottom > 80 && focused;
-    final keyboardOpen = visualOpen || (!hasBrowser && flutterOpen);
+    // Overlay insets only when the layout viewport stayed tall (resizes-visual).
+    // If innerHeight shrank with the keyboard, expanding the host fills the
+    // screen; leftover Flutter insets without overlay would leave a blank gap.
+    final keyboardOpen = overlayOpen || (!hasBrowser && flutterOpen);
     final height = math.max(media.size.height, browserHeight ?? media.size.height);
     final inset = keyboardOpen
         ? math.max(media.viewInsets.bottom, overlap)

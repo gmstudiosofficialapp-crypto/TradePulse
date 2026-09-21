@@ -50,6 +50,19 @@
   </style>
 </head>
 <body>
+  <script>
+    window.__tpInstallPrompt = null;
+    window.__tpTakeInstallPrompt = function () {
+      var prompt = window.__tpInstallPrompt;
+      window.__tpInstallPrompt = null;
+      return prompt || null;
+    };
+    window.addEventListener('beforeinstallprompt', function (event) {
+      event.preventDefault();
+      window.__tpInstallPrompt = event;
+      window.dispatchEvent(new Event('tp-install-ready'));
+    });
+  </script>
   <script src="flutter_bootstrap.js" async></script>
 </body>
 </html>
