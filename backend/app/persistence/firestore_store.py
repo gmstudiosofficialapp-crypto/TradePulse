@@ -113,6 +113,9 @@ class FirestoreTradeStore:
             for doc in self._db.collection("trades").where("status", "==", "OPEN").stream()
         ]
 
+    def delete(self, trade_id: str) -> None:
+        self._db.collection("trades").document(trade_id).delete()
+
 
 class FirestoreTransactionStore:
     def __init__(self, db) -> None:
@@ -130,6 +133,10 @@ class FirestoreTransactionStore:
 
 
 class FirestoreLedger:
+    """Firestore transactions. Settlement can be mirrored after the hot path."""
+
+    defer_writes = True
+
     def __init__(
         self,
         db,

@@ -20,6 +20,7 @@ class CandlestickChart extends StatefulWidget {
     this.immersive = false,
     this.overlayInsets = EdgeInsets.zero,
     this.livePrice,
+    this.feedState,
   });
 
   final List<MarketCandle> candles;
@@ -30,6 +31,7 @@ class CandlestickChart extends StatefulWidget {
   final bool immersive;
   final EdgeInsets overlayInsets;
   final double? livePrice;
+  final EngineState? feedState;
 
   @override
   State<CandlestickChart> createState() => _CandlestickChartState();
@@ -174,24 +176,34 @@ class _CandlestickChartState extends State<CandlestickChart>
       child: ColoredBox(
         color: colors.chart,
         child: widget.height == null
-            ? _chartBody(colors)
+            ? _stage(colors)
             : SizedBox(
                 height: widget.height,
                 width: double.infinity,
-                child: _chartBody(colors),
+                child: _stage(colors),
               ),
+      ),
+    );
+  }
+
+  Widget _stage(TradePulseColors colors) {
+    return AnimatedSwitcher(
+      duration: const Duration(milliseconds: 320),
+      child: KeyedSubtree(
+        key: ValueKey(
+          widget.candles.isEmpty
+              ? (widget.feedState == EngineState.offline ? 'offline' : 'loading')
+              : 'chart',
+        ),
+        child: _chartBody(colors),
       ),
     );
   }
 
   Widget _chartBody(TradePulseColors colors) {
     if (widget.candles.isEmpty) {
-      return Center(
-        child: Text(
-          'Waiting for candles…',
-          style: TextStyle(color: colors.mutedText),
-        ),
-      );
+      final offline = widget.feedState == EngineState.offline;
+      return _ChartPlaceholder(offline: offline, colors: colors);
     }
     return LayoutBuilder(
       builder: (context, constraints) {
@@ -350,45 +362,46 @@ class _CandlePainter extends CustomPainter {
       return plot.bottom - ((price - minP) / span) * plot.height;
     }
 
-    final candleWidth = plot.width / candles.length;
-    final bodyHalf = (candleWidth * 0.28).clamp(2.4, 11.0);
-    final wickWidth = (candleWidth * 0.07).clamp(1.0, 2.0);
+    final slot = plot.width / candles.length;
+    final candleWidth = slot;
+    final bodyWidth = (slot * 0.62).clamp(2.2, 14.0);
+    final wickWidth = 1.15;
 
     canvas.save();
     canvas.clipRect(plot);
     for (var i = 0; i < candles.length; i++) {
       final candle = candles[i];
-      final color = candle.close >= candle.open ? up : down;
-      final x = plot.left + i * candleWidth + candleWidth / 2;
+      final bullish = candle.close >= candle.open;
+      final color = bullish ? up : down;
+      final x = plot.left + i * slot + slot / 2;
       final yHigh = yFor(candle.high);
       final yLow = yFor(candle.low);
       final yOpen = yFor(candle.open);
       final yClose = yFor(candle.close);
       final bodyTop = math.min(yOpen, yClose);
       final bodyBottom = math.max(yOpen, yClose);
-      final forming = i == candles.length - 1 && !candle.closed;
-      final minBody = math.max(1.6, bodyHalf * 0.45);
-      final rawHeight = bodyBottom - bodyTop;
-      final height = forming ? math.max(0.9, rawHeight) : math.max(minBody, rawHeight);
+      final height = math.max(1.25, bodyBottom - bodyTop);
       final bodyCenterY = (yOpen + yClose) / 2;
-      final wickSpan = (yLow - yHigh).abs();
-      if (wickSpan > 0.4) {
-        final wick = Paint()
-          ..color = color
-          ..strokeWidth = wickWidth
-          ..strokeCap = StrokeCap.round;
-        canvas.drawLine(Offset(x, yHigh), Offset(x, yLow), wick);
-      }
-      canvas.drawRRect(
-        RRect.fromRectAndRadius(
-          Rect.fromCenter(
-            center: Offset(x, bodyCenterY),
-            width: bodyHalf * 2,
-            height: height,
-          ),
-          const Radius.circular(1.5),
+      final wick = Paint()
+        ..color = color.withValues(alpha: 0.95)
+        ..strokeWidth = wickWidth
+        ..strokeCap = StrokeCap.square;
+      canvas.drawLine(Offset(x, yHigh), Offset(x, yLow), wick);
+      final body = RRect.fromRectAndRadius(
+        Rect.fromCenter(
+          center: Offset(x, bodyCenterY),
+          width: bodyWidth,
+          height: height,
         ),
-        Paint()..color = color,
+        const Radius.circular(0.6),
+      );
+      canvas.drawRRect(body, Paint()..color = color);
+      canvas.drawRRect(
+        body,
+        Paint()
+          ..color = color.withValues(alpha: 0.35)
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 0.6,
       );
     }
     canvas.restore();
@@ -437,27 +450,29 @@ class _CandlePainter extends CustomPainter {
     }
 
     for (final entry in entries) {
-      final x = xAt(entry.entryTime);
-      if (x == null) continue;
-      final y = yFor(entry.entryPrice);
+      final index = indexOfEntry(candles, entry.entryTime);
+      if (index == null) continue;
+      final candle = candles[index];
+      final x = plot.left + index * candleWidth + candleWidth / 2;
       final buy = entry.direction == 'BUY';
       final color = buy ? up : down;
-      final hot = highlightId == entry.tradeId;
-      final dash = Paint()
-        ..color = color.withValues(alpha: hot ? 0.75 : 0.45)
-        ..strokeWidth = hot ? 1.3 : 1.0;
-      var dashX = x;
-      while (dashX < plot.right) {
-        canvas.drawLine(Offset(dashX, y), Offset(dashX + 5, y), dash);
-        dashX += 9;
-      }
-      _tinyFlag(
+      final anchorY = buy ? yFor(candle.low) : yFor(candle.high);
+      _entryArrow(
         canvas,
-        Offset(x + 4, y),
-        buy ? 'B' : 'S',
-        color,
-        buy,
+        center: Offset(x, anchorY),
+        buy: buy,
+        color: color,
+        plot: plot,
       );
+      final y = yFor(entry.entryPrice);
+      final dash = Paint()
+        ..color = color.withValues(alpha: 0.28)
+        ..strokeWidth = 1;
+      var dashX = plot.left;
+      while (dashX < plot.right) {
+        canvas.drawLine(Offset(dashX, y), Offset(dashX + 3, y), dash);
+        dashX += 8;
+      }
     }
 
     final lastY = yFor(last).clamp(plot.top + 8, plot.bottom - 8);
@@ -479,6 +494,41 @@ class _CandlePainter extends CustomPainter {
           '${candle.openTime.hour.toString().padLeft(2, '0')}:${candle.openTime.minute.toString().padLeft(2, '0')}';
       _label(canvas, stamp, Offset(xPos, plot.bottom + 4), labelStyle);
     }
+  }
+
+  void _entryArrow(
+    Canvas canvas, {
+    required Offset center,
+    required bool buy,
+    required Color color,
+    required Rect plot,
+  }) {
+    const gap = 8.0;
+    final tip = Offset(
+      center.dx,
+      buy ? math.min(plot.bottom - 2, center.dy + gap) : math.max(plot.top + 2, center.dy - gap),
+    );
+    final base = buy ? tip.dy + 9 : tip.dy - 9;
+    final path = Path()
+      ..moveTo(tip.dx, tip.dy)
+      ..lineTo(tip.dx - 5.5, base)
+      ..lineTo(tip.dx + 5.5, base)
+      ..close();
+    canvas.drawPath(path, Paint()..color = color);
+    final label = TextPainter(
+      text: TextSpan(
+        text: buy ? 'BUY' : 'SELL',
+        style: TextStyle(
+          color: color,
+          fontSize: 9,
+          fontWeight: FontWeight.w800,
+          letterSpacing: 0.4,
+        ),
+      ),
+      textDirection: TextDirection.ltr,
+    )..layout();
+    final labelTop = buy ? base + 2 : base - label.height - 2;
+    label.paint(canvas, Offset(tip.dx - label.width / 2, labelTop));
   }
 
   void _tinyFlag(
@@ -549,5 +599,113 @@ class _CandlePainter extends CustomPainter {
             (oldDelegate.candles.last.close != candles.last.close ||
                 oldDelegate.candles.last.high != candles.last.high ||
                 oldDelegate.candles.last.low != candles.last.low));
+  }
+}
+
+class _ChartPlaceholder extends StatefulWidget {
+  const _ChartPlaceholder({required this.offline, required this.colors});
+
+  final bool offline;
+  final TradePulseColors colors;
+
+  @override
+  State<_ChartPlaceholder> createState() => _ChartPlaceholderState();
+}
+
+class _ChartPlaceholderState extends State<_ChartPlaceholder>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _pulse;
+
+  @override
+  void initState() {
+    super.initState();
+    _pulse = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1400),
+    );
+    if (!widget.offline) _pulse.repeat(reverse: true);
+  }
+
+  @override
+  void didUpdateWidget(covariant _ChartPlaceholder oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.offline) {
+      _pulse.stop();
+    } else if (!_pulse.isAnimating) {
+      _pulse.repeat(reverse: true);
+    }
+  }
+
+  @override
+  void dispose() {
+    _pulse.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final label = widget.offline ? 'Market offline' : 'Loading market data';
+    return Center(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (!widget.offline)
+            AnimatedBuilder(
+              animation: _pulse,
+              builder: (context, _) {
+                return CustomPaint(
+                  size: const Size(168, 72),
+                  painter: _LoadingCandlesPainter(
+                    color: widget.colors.accent.withValues(
+                      alpha: 0.35 + _pulse.value * 0.4,
+                    ),
+                  ),
+                );
+              },
+            )
+          else
+            Icon(Icons.cloud_off, color: widget.colors.mutedText, size: 28),
+          const SizedBox(height: 12),
+          Text(
+            label,
+            style: TextStyle(
+              color: widget.colors.mutedText,
+              fontSize: 13,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Decorative bars only. These are not prices and are never drawn as candles.
+class _LoadingCandlesPainter extends CustomPainter {
+  _LoadingCandlesPainter({required this.color});
+
+  final Color color;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()..color = color;
+    const heights = [0.45, 0.72, 0.38, 0.86, 0.55, 0.68, 0.42];
+    final slot = size.width / heights.length;
+    for (var i = 0; i < heights.length; i++) {
+      final bar = size.height * heights[i];
+      final x = i * slot + slot * 0.28;
+      canvas.drawRRect(
+        RRect.fromRectAndRadius(
+          Rect.fromLTWH(x, (size.height - bar) / 2, slot * 0.44, bar),
+          const Radius.circular(1.5),
+        ),
+        paint,
+      );
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _LoadingCandlesPainter oldDelegate) {
+    return oldDelegate.color != color;
   }
 }

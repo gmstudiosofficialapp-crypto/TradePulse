@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import threading
 import uuid
 from datetime import datetime, timedelta, timezone
 
@@ -11,6 +12,9 @@ from app.persistence.memory import (
     MemoryTradeStore,
     MemoryTransactionStore,
 )
+
+
+HISTORY_LIMIT = 100
 
 
 def _utc(now: datetime | None) -> datetime:
@@ -76,18 +80,68 @@ class DemoTradingEngine:
         self.trades = trades or MemoryTradeStore()
         self.transactions = transactions or MemoryTransactionStore()
         self.ledger = ledger or MemoryLedger(self.accounts, self.trades, self.transactions)
+        self._hot_open: dict[str, dict] = {}
+        self._hot_ready = False
+        self._overlay: dict[str, dict] = {}
+        self._balance_cache: dict[str, float] = {}
+        self._persist_lock = threading.Lock()
 
     def balance(self, user_id: str) -> float:
+        cached = self._balance_cache.get(user_id)
+        if cached is not None:
+            return cached
         return self.accounts.get_balance(user_id)
+
+    def open_snapshot(self) -> list[dict]:
+        """Open trades kept in memory so expiry does not query Firestore per tick."""
+        self._ensure_hot()
+        return [dict(trade) for trade in self._hot_open.values()]
+
+    def listed_trades(self, user_id: str) -> list[dict]:
+        rows = {item["trade_id"]: item for item in self.trades.list_for_user(user_id)}
+        for trade_id, trade in self._overlay.items():
+            if trade.get("user_id") == user_id:
+                rows[trade_id] = trade
+        ordered = sorted(
+            rows.values(),
+            key=lambda item: (item.get("created_at", ""), item.get("trade_id", "")),
+            reverse=True,
+        )
+        return ordered[:HISTORY_LIMIT]
+
+    def _ensure_hot(self) -> None:
+        if self._hot_ready:
+            return
+        for trade in self.trades.all_open():
+            trade_id = trade.get("trade_id")
+            if trade_id:
+                self._hot_open.setdefault(trade_id, dict(trade))
+        self._hot_ready = True
+
+    def _trim_history(self, user_id: str) -> None:
+        rows = self.trades.list_for_user(user_id)
+        extra = len(rows) - HISTORY_LIMIT
+        if extra <= 0:
+            return
+        closed_oldest = [row for row in reversed(rows) if row.get("result") is not None]
+        for row in closed_oldest[:extra]:
+            trade_id = row.get("trade_id")
+            if not trade_id:
+                continue
+            self.trades.delete(trade_id)
+            self._overlay.pop(trade_id, None)
 
     def credit_demo(self, user_id: str, amount: float) -> float:
         if amount <= 0:
             raise ValueError("Invalid credit amount")
         credited = round(amount, 2)
         if hasattr(self.ledger, "commit_credit"):
-            return self.ledger.commit_credit(user_id, credited)
-        after = round(self.balance(user_id) + credited, 2)
-        self.accounts.set_balance(user_id, after)
+            after = self.ledger.commit_credit(user_id, credited)
+        else:
+            after = round(self.balance(user_id) + credited, 2)
+            self.accounts.set_balance(user_id, after)
+        if user_id in self._balance_cache:
+            self._balance_cache[user_id] = after
         return after
 
     def ensure_account(self, user_id: str, email: str = "", name: str = "") -> dict:
@@ -155,7 +209,7 @@ class DemoTradingEngine:
             "referenceId": trade_id,
             "createdAt": moment.isoformat(),
         }
-        return self.ledger.commit_open(
+        opened = self.ledger.commit_open(
             user_id=user_id,
             stake=round(stake, 2),
             asset=asset,
@@ -163,12 +217,62 @@ class DemoTradingEngine:
             trade=trade,
             transaction=entry_txn,
         )
+        self._hot_open[opened["trade_id"]] = dict(opened)
+        self._hot_ready = True
+        if getattr(self.ledger, "defer_writes", False):
+            self._overlay[opened["trade_id"]] = dict(opened)
+            self._balance_cache[user_id] = self.accounts.get_balance(user_id)
+        self._trim_history(user_id)
+        return opened
 
     def settle(self, trade_id: str, expiry_price: float) -> dict:
-        return self.ledger.commit_settle(trade_id, expiry_price, _compute_settlement)
+        if getattr(self.ledger, "defer_writes", False):
+            return self._settle_hot(trade_id, expiry_price)
+        updated = self.ledger.commit_settle(trade_id, expiry_price, _compute_settlement)
+        self._hot_open.pop(trade_id, None)
+        self._trim_history(updated["user_id"])
+        return updated
+
+    def _settle_hot(self, trade_id: str, expiry_price: float) -> dict:
+        self._ensure_hot()
+        trade = self._hot_open.get(trade_id) or self._overlay.get(trade_id)
+        if trade is None:
+            stored = self.trades.get(trade_id)
+            if stored is None:
+                raise ValueError("Trade not found")
+            trade = stored
+        if trade.get("result") is not None:
+            return dict(trade)
+        updated, credit, _extra = _compute_settlement(trade, expiry_price)
+        user_id = updated["user_id"]
+        if credit:
+            self._balance_cache[user_id] = round(self._cached_balance(user_id) + credit, 2)
+        elif user_id not in self._balance_cache:
+            self._cached_balance(user_id)
+        self._overlay[trade_id] = updated
+        self._hot_open.pop(trade_id, None)
+        threading.Thread(
+            target=self._persist_settle,
+            args=(trade_id, expiry_price, user_id),
+            daemon=True,
+        ).start()
+        return updated
+
+    def _cached_balance(self, user_id: str) -> float:
+        if user_id not in self._balance_cache:
+            self._balance_cache[user_id] = self.accounts.get_balance(user_id)
+        return self._balance_cache[user_id]
+
+    def _persist_settle(self, trade_id: str, expiry_price: float, user_id: str) -> None:
+        with self._persist_lock:
+            try:
+                self.ledger.commit_settle(trade_id, expiry_price, _compute_settlement)
+                self._trim_history(user_id)
+            except Exception:
+                return
 
     def statistics(self, user_id: str) -> dict:
-        rows = [t for t in self.trades.list_for_user(user_id) if t["result"]]
+        rows = [t for t in self.listed_trades(user_id) if t.get("result")]
         wins = sum(1 for t in rows if t["result"] == "WIN")
         losses = sum(1 for t in rows if t["result"] == "LOSS")
         draws = sum(1 for t in rows if t["result"] == "DRAW")

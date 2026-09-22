@@ -67,6 +67,9 @@ class MemoryTradeStore:
     def all_open(self) -> list[dict]:
         return [dict(t) for t in self._trades.values() if t["result"] is None]
 
+    def delete(self, trade_id: str) -> None:
+        self._trades.pop(trade_id, None)
+
 
 class MemoryTransactionStore:
     def __init__(self) -> None:

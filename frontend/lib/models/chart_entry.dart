@@ -52,7 +52,19 @@ bool candleContainsEntry(MarketCandle candle, DateTime entryTime) {
   final time = entryTime.toUtc();
   final open = candle.openTime.toUtc();
   final close = candle.closeTime.toUtc();
-  return !time.isBefore(open) && time.isBefore(close);
+  final windowEnd = candle.closed
+      ? close
+      : (close.isBefore(open.add(const Duration(minutes: 1)))
+          ? open.add(const Duration(minutes: 1))
+          : close);
+  return !time.isBefore(open) && time.isBefore(windowEnd);
+}
+
+int? indexOfEntry(List<MarketCandle> candles, DateTime entryTime) {
+  for (var index = 0; index < candles.length; index++) {
+    if (candleContainsEntry(candles[index], entryTime)) return index;
+  }
+  return null;
 }
 
 MarketCandle? candleForEntry(List<MarketCandle> candles, DateTime entryTime) {

@@ -75,6 +75,35 @@ void main() {
     expect(ChartEntryMarker.uniqueForAsset('BTC/USD-OTC', [trade]), hasLength(1));
   });
 
+  test('entry index stays on the candle that contains the time', () {
+    final candles = [
+      MarketCandle(
+        asset: 'BTC/USD-OTC',
+        open: 1,
+        high: 2,
+        low: 0.5,
+        close: 1.2,
+        volume: 4,
+        openTime: DateTime.utc(2026, 9, 19, 20, 5),
+        closeTime: DateTime.utc(2026, 9, 19, 20, 6),
+        closed: true,
+      ),
+      MarketCandle(
+        asset: 'BTC/USD-OTC',
+        open: 1.2,
+        high: 1.4,
+        low: 1.1,
+        close: 1.3,
+        volume: 4,
+        openTime: DateTime.utc(2026, 9, 19, 20, 6),
+        closeTime: DateTime.utc(2026, 9, 19, 20, 7),
+        closed: true,
+      ),
+    ];
+    expect(indexOfEntry(candles, DateTime.utc(2026, 9, 19, 20, 5, 13)), 0);
+    expect(indexOfEntry(candles, DateTime.utc(2026, 9, 19, 20, 6)), 1);
+  });
+
   test('optional profile fields can stay empty', () async {
     final auth = LocalAuthService();
     await auth.signup(

@@ -82,15 +82,13 @@ def build_signal_payload(
         "future_count": len(futures),
         "rolling": True,
     }
+    if closed:
+        closed_norm = _normalize_candle(closed, "CLOSED", precomputed=False)
+        if closed_norm is not None:
+            closed_norm["closed"] = True
+            body["closed_live"] = closed_norm
+            body["closed_live_id"] = closed_norm["id"]
     if message_type == "roll" and live is not None:
-        body["closed_live_id"] = candle_id(
-            str((closed or {}).get("candle_start_time") or "")
-        ) if closed else None
-        if closed:
-            closed_norm = _normalize_candle(closed, "CLOSED", precomputed=False)
-            if closed_norm is not None:
-                closed_norm["closed"] = True
-                body["closed_live"] = closed_norm
         body["promoted_live_id"] = live["id"]
         body["new_future_id"] = futures[-1]["id"]
     return body

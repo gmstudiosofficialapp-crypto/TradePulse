@@ -25,6 +25,7 @@ class TradingController extends ChangeNotifier {
   TradeSignal signal = TradeSignal.waiting('BTC/USD-OTC');
   String? error;
   Timer? _poll;
+  int _balanceEpoch = 0;
 
   List<DemoTrade> get activeTrades =>
       history.where((trade) => trade.isOpen).toList();
@@ -101,10 +102,14 @@ class TradingController extends ChangeNotifier {
   Future<void> refresh({String? asset}) async {
     final id = userId;
     if (id == null) return;
+    final epoch = _balanceEpoch;
     try {
-      balance = await _service.getBalance(id);
+      final nextBalance = await _service.getBalance(id);
       statistics = await _service.getStatistics(id);
       history = _mergeHistory(await _service.getTrades(id));
+      if (epoch == _balanceEpoch) {
+        balance = nextBalance;
+      }
       if (asset != null) {
         await loadSignal(asset);
       }
@@ -263,6 +268,7 @@ class TradingController extends ChangeNotifier {
     }
     if (type == 'balance_updated' && event['balance'] is num) {
       if (event['user_id'] == null || event['user_id'] == userId) {
+        _balanceEpoch++;
         balance = (event['balance'] as num).toDouble();
         notifyListeners();
       }
@@ -306,11 +312,17 @@ class TradingController extends ChangeNotifier {
   List<DemoTrade> _mergeHistory(List<DemoTrade> remote) {
     final byId = {for (final item in remote) item.tradeId: item};
     for (final local in history) {
-      if (local.isOpen && !byId.containsKey(local.tradeId)) {
+      final existing = byId[local.tradeId];
+      if (existing == null && local.isOpen) {
+        byId[local.tradeId] = local;
+      } else if (existing != null && existing.isOpen && !local.isOpen) {
         byId[local.tradeId] = local;
       }
     }
-    return byId.values.toList();
+    final rows = byId.values.toList()
+      ..sort((a, b) => b.entryTime.compareTo(a.entryTime));
+    if (rows.length <= 100) return rows;
+    return rows.take(100).toList();
   }
 
   void _upsertSignal(TradeSignal next) {

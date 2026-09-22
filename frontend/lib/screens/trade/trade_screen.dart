@@ -185,6 +185,7 @@ class _TradeScreenState extends State<TradeScreen> {
                   highlightId: _highlightId,
                   immersive: true,
                   livePrice: quote?.price,
+                  feedState: market.status.state,
                   overlayInsets: const EdgeInsets.fromLTRB(0, 92, 0, 236),
                 ),
               ),

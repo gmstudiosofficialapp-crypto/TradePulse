@@ -112,7 +112,7 @@ def demo_statistics(user: AuthUser) -> dict:
 @router.get("/demo/trades")
 def demo_trades(user: AuthUser) -> dict:
     _bootstrap(user)
-    return {"trades": get_trading().trades.list_for_user(user.uid), "simulated": True}
+    return {"trades": get_trading().listed_trades(user.uid), "simulated": True}
 
 
 @router.get("/demo/transactions")

@@ -83,7 +83,7 @@ class Phase3Coordinator:
     ) -> None:
         moment = now if now.tzinfo else now.replace(tzinfo=timezone.utc)
         preferred = preferred or {}
-        for trade in list(self.trading.trades.all_open()):
+        for trade in list(self.trading.open_snapshot()):
             expiry = datetime.fromisoformat(trade["expiry_time"])
             if expiry.tzinfo is None:
                 expiry = expiry.replace(tzinfo=timezone.utc)

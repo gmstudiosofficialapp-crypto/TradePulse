@@ -17,6 +17,7 @@ class SignalFutureHub:
         self._clients: set[WebSocket] = set()
         self._sequence = 0
         self._last_live_open: str | None = None
+        self._last_closed: Candle | None = None
 
     def connect(self, websocket: WebSocket) -> None:
         self._clients.add(websocket)
@@ -30,22 +31,25 @@ class SignalFutureHub:
 
     def envelope(self, runtime: MarketRuntime, message_type: str, closed: Candle | None = None) -> dict | None:
         raw = runtime.btc_future_snapshot()
+        # Snapshots and live updates repeat the last closed candle so a missed
+        # roll can still be matched. The candle is the one the book just closed.
+        remembered = closed if closed is not None else self._last_closed
         closed_payload = None
-        if closed is not None:
+        if remembered is not None:
             closed_payload = {
-                "asset": closed.asset,
-                "candle_start_time": closed.open_time.isoformat(),
-                "candle_end_time": closed.close_time.isoformat(),
-                "open": closed.open,
-                "high": closed.high,
-                "low": closed.low,
-                "close": closed.close,
+                "asset": remembered.asset,
+                "candle_start_time": remembered.open_time.isoformat(),
+                "candle_end_time": remembered.close_time.isoformat(),
+                "open": remembered.open,
+                "high": remembered.high,
+                "low": remembered.low,
+                "close": remembered.close,
                 "direction": "UP"
-                if closed.close > closed.open
+                if remembered.close > remembered.open
                 else "DOWN"
-                if closed.close < closed.open
+                if remembered.close < remembered.open
                 else "FLAT",
-                "volume": closed.volume,
+                "volume": remembered.volume,
                 "closed": True,
             }
         return build_signal_payload(
@@ -79,6 +83,7 @@ class SignalFutureHub:
         live_open = live.get("candle_start_time")
         if closed is not None and live_open != self._last_live_open:
             self._last_live_open = live_open
+            self._last_closed = closed
             payload = self.envelope(runtime, "roll", closed)
             if payload is not None:
                 await self.broadcast(payload)

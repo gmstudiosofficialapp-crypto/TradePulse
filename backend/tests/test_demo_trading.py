@@ -139,6 +139,102 @@ def test_trade_settlement_and_history() -> None:
     assert stats["total_trades"] == 1
 
 
+def test_history_keeps_the_latest_100_trades() -> None:
+    engine = DemoTradingEngine()
+    start = datetime(2026, 1, 1, tzinfo=timezone.utc)
+    kept = []
+    for index in range(101):
+        trade = engine.open_trade(
+            "alice",
+            "BTC/USD-OTC",
+            "BUY",
+            1,
+            100,
+            now=start + timedelta(seconds=index),
+            expiry_seconds=5,
+        )
+        engine.settle(trade["trade_id"], 99)
+        kept.append(trade["trade_id"])
+    other = engine.open_trade(
+        "bob",
+        "ETH/USD-OTC",
+        "SELL",
+        1,
+        50,
+        now=start,
+        expiry_seconds=5,
+    )
+    rows = engine.trades.list_for_user("alice")
+    ids = {row["trade_id"] for row in rows}
+    assert len(rows) == 100
+    assert kept[0] not in ids
+    assert kept[-1] in ids
+    assert engine.trades.get(other["trade_id"])["user_id"] == "bob"
+
+
+def test_hot_settle_updates_balance_before_persist() -> None:
+    accounts = _TrackingAccounts()
+    ledger = _DeferredLedger(accounts)
+    engine = DemoTradingEngine(
+        accounts=accounts,
+        trades=_LooseTrades(),
+        ledger=ledger,
+    )
+    trade = engine.open_trade("alice", "BTC/USD-OTC", "BUY", 10, 100)
+    settled = engine.settle(trade["trade_id"], 110)
+    assert settled["result"] == "WIN"
+    assert engine.balance("alice") == 10009.2
+    again = engine.settle(trade["trade_id"], 80)
+    assert again["result"] == "WIN"
+    assert engine.balance("alice") == 10009.2
+
+
+class _TrackingAccounts:
+    def __init__(self) -> None:
+        self.amount = 10000.0
+
+    def get_balance(self, user_id: str) -> float:
+        return self.amount
+
+    def set_balance(self, user_id: str, amount: float) -> None:
+        self.amount = amount
+
+
+class _LooseTrades:
+    def __init__(self) -> None:
+        self.rows: dict[str, dict] = {}
+
+    def list_for_user(self, user_id: str) -> list[dict]:
+        return [dict(row) for row in self.rows.values() if row.get("user_id") == user_id]
+
+    def all_open(self) -> list[dict]:
+        return []
+
+    def get(self, trade_id: str) -> dict | None:
+        row = self.rows.get(trade_id)
+        return dict(row) if row is not None else None
+
+    def delete(self, trade_id: str) -> None:
+        self.rows.pop(trade_id, None)
+
+    def save(self, trade: dict) -> None:
+        self.rows[trade["trade_id"]] = dict(trade)
+
+
+class _DeferredLedger:
+    defer_writes = True
+
+    def __init__(self, accounts: _TrackingAccounts) -> None:
+        self.accounts = accounts
+
+    def commit_open(self, **kwargs) -> dict:
+        self.accounts.amount = round(self.accounts.amount - kwargs["stake"], 2)
+        return dict(kwargs["trade"])
+
+    def commit_settle(self, trade_id: str, expiry_price: float, apply) -> dict:
+        return {"trade_id": trade_id}
+
+
 def test_duplicate_settlement_protection() -> None:
     engine = DemoTradingEngine()
     trade = engine.open_trade("finn", "BTC/USD-OTC", "BUY", 10, 100)
