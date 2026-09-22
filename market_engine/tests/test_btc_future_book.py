@@ -12,6 +12,7 @@ from market_engine.services.btc_future_book import (
     remaining_ticks,
     ticks_in_minute,
 )
+from market_engine.services.candle_engine import minute_floor_utc
 from market_engine.services.market_runtime import AssetStream, MarketRuntime
 
 
@@ -253,3 +254,122 @@ def test_irregular_gaps_still_emit_canonical_tick_count() -> None:
     assert emitted == per
     assert stream.candles.current is not None
     assert int(stream.candles.current.volume) == per
+
+
+def _runtime() -> MarketRuntime:
+    return MarketRuntime(
+        settings=EngineSettings(history_size=2, warmup_ticks_per_minute=2),
+        assets=[ASSET_CONFIGS[BTC_SYMBOL]],
+    )
+
+
+def _assert_wall_clock_book(runtime: MarketRuntime, moment: datetime) -> None:
+    live_open = minute_floor_utc(moment)
+    live = runtime.open_candles[BTC_SYMBOL]
+    assert live.open_time == live_open
+    assert runtime.btc_future_book.live_open == live_open
+    assert [item.open_time for item in runtime.btc_future_book.futures] == [
+        live_open + timedelta(minutes=1),
+        live_open + timedelta(minutes=2),
+        live_open + timedelta(minutes=3),
+    ]
+
+
+def test_arbitrary_startup_minute_becomes_live() -> None:
+    starts = [
+        datetime(2026, 9, 22, 3, 52, 37, tzinfo=timezone.utc),
+        datetime(2026, 9, 22, 8, 14, 3, tzinfo=timezone.utc),
+        datetime(2026, 9, 22, 17, 59, 58, tzinfo=timezone.utc),
+        datetime(2026, 9, 22, 18, 0, 0, tzinfo=timezone.utc),
+        datetime(1998, 7, 4, 0, 0, 1, tzinfo=timezone.utc),
+    ]
+    opened = []
+    for moment in starts:
+        runtime = _runtime()
+        runtime.warmup(moment)
+        _assert_wall_clock_book(runtime, moment)
+        opened.append(runtime.open_candles[BTC_SYMBOL].open_time)
+    assert len(set(opened)) == len(starts)
+
+
+def test_minute_boundary_advances_live_from_the_wall_clock() -> None:
+    moment = datetime(2019, 12, 31, 23, 59, 59, tzinfo=timezone.utc)
+    runtime = _runtime()
+    runtime.warmup(moment)
+    _assert_wall_clock_book(runtime, moment)
+    runtime.step(moment + timedelta(seconds=1))
+    _assert_wall_clock_book(runtime, moment + timedelta(seconds=1))
+
+
+def test_delayed_processing_catches_up_to_the_current_minute() -> None:
+    moment = datetime(2024, 5, 19, 14, 22, 9, tzinfo=timezone.utc)
+    runtime = _runtime()
+    runtime.warmup(moment)
+    predicted = {item.open_time: item for item in runtime.btc_future_book.futures}
+    previous = runtime.open_candles[BTC_SYMBOL].open_time
+    wake = previous + timedelta(minutes=5, seconds=17)
+    events = runtime.step(wake)
+    _assert_wall_clock_book(runtime, wake)
+    assert runtime.open_candles[BTC_SYMBOL].open_time != previous + timedelta(minutes=1)
+    closed = [
+        event.closed
+        for event in events
+        if event.closed is not None and event.tick.asset == BTC_SYMBOL
+    ]
+    matched = [candle.open_time for candle in closed if candle.open_time in predicted]
+    assert matched == list(predicted)
+    for candle in closed:
+        expected = predicted.get(candle.open_time)
+        if expected is None:
+            continue
+        assert _ohlc(candle) == _ohlc(expected)
+        assert int(candle.volume) == expected.volume
+
+
+def test_restart_at_any_minute_aligns_to_that_minute() -> None:
+    first = datetime(2022, 6, 6, 4, 44, 4, tzinfo=timezone.utc)
+    second = datetime(2028, 2, 29, 21, 5, 0, tzinfo=timezone.utc)
+    original = _runtime()
+    original.warmup(first)
+    _assert_wall_clock_book(original, first)
+    restarted = _runtime()
+    restarted.warmup(second)
+    _assert_wall_clock_book(restarted, second)
+    assert (
+        restarted.open_candles[BTC_SYMBOL].open_time
+        != original.open_candles[BTC_SYMBOL].open_time
+    )
+
+
+def test_omitted_clock_follows_the_server_utc_minute() -> None:
+    before = minute_floor_utc(datetime.now(timezone.utc))
+    runtime = _runtime()
+    runtime.warmup()
+    runtime.step()
+    after = minute_floor_utc(datetime.now(timezone.utc))
+    live_open = runtime.open_candles[BTC_SYMBOL].open_time
+    assert live_open == before or live_open == after
+    _assert_wall_clock_book(runtime, live_open)
+
+
+def test_production_candle_scheduling_has_no_fixed_clock_time() -> None:
+    import inspect
+    from pathlib import Path
+
+    import market_engine.services.market_runtime as runtime_module
+
+    root = Path(runtime_module.__file__).resolve().parent
+    for name in (
+        "btc_future_book.py",
+        "market_runtime.py",
+        "candle_engine.py",
+        "tick_engine.py",
+    ):
+        source = (root / name).read_text(encoding="utf-8")
+        assert "datetime(" not in source
+        assert "utcnow" not in source
+
+    loop = inspect.getsource(MarketRuntime._loop)
+    assert loop.index("while self.running") < loop.index("datetime.now(timezone.utc)")
+    assert "datetime.now(timezone.utc)" in inspect.getsource(MarketRuntime.warmup)
+    assert "datetime.now(timezone.utc)" in inspect.getsource(MarketRuntime.step)

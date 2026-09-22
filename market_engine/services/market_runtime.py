@@ -140,6 +140,12 @@ class MarketRuntime:
         return MarketEvent(tick=tick, candle=current, closed=closed)
 
     def step(self, timestamp: datetime | None = None) -> list[MarketEvent]:
+        """Advance every stream to ``timestamp``.
+
+        When ``timestamp`` is omitted the server's current UTC wall clock is
+        read here. BTC catches up every missed minute in this call, so the
+        live candle opens on ``floor(now, 1 minute)``.
+        """
         now = timestamp or datetime.now(timezone.utc)
         if now.tzinfo is None:
             now = now.replace(tzinfo=timezone.utc)
@@ -184,6 +190,8 @@ class MarketRuntime:
         )
         delay = max(interval / 1000, 0.05)
         while self.running:
+            # Read the clock on every pass. A stalled loop then jumps to the
+            # minute that is current when this process runs again.
             now = datetime.now(timezone.utc)
             for event in self.step(now):
                 for handler in self._handlers:

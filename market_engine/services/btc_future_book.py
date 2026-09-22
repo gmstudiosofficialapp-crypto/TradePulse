@@ -104,17 +104,17 @@ def due_live_stamps(
     live: Candle | None,
     now: datetime,
     interval_ms: int,
-    limit: int | None = None,
 ) -> list[datetime]:
-    """Authoritative BTC stamps whose grid time is due at `now`.
+    """Every BTC grid stamp due at the server's current UTC time.
 
-    Wall-clock jitter cannot skip or duplicate ticks: a late loop catches up
-    onto the same 1m grid the future book simulates.
+    ``now`` is the wall clock. The live minute is ``floor(now, 1 minute)``.
+    A late call returns the whole gap in one result, including every missed
+    minute, so the candle clock cannot stay on an older minute. Tick indexes
+    only place prices on that grid. They are not the clock.
     """
     now = _utc(now)
     interval_ms = max(interval_ms, 1)
     per = ticks_per_minute(interval_ms)
-    cap = per if limit is None else max(1, limit)
     wall_open = minute_floor_utc(now)
     if live is None:
         return [tick_stamp(wall_open, 0, interval_ms)]
@@ -122,7 +122,7 @@ def due_live_stamps(
     open_time = minute_floor_utc(live.open_time)
     index = min(per, max(0, int(live.volume)))
     stamps: list[datetime] = []
-    while len(stamps) < cap:
+    while True:
         if open_time < wall_open:
             if index < per:
                 stamps.append(tick_stamp(open_time, index, interval_ms))
@@ -131,8 +131,12 @@ def due_live_stamps(
             open_time = open_time + timedelta(minutes=1)
             index = 0
             continue
+        if open_time > wall_open:
+            break
         elapsed_ms = (now - open_time).total_seconds() * 1000
         due_index = min(per, int(elapsed_ms // interval_ms) + 1)
+        if due_index < 1:
+            break
         if index < due_index:
             stamps.append(tick_stamp(open_time, index, interval_ms))
             index += 1
