@@ -255,6 +255,7 @@ class TradingController extends ChangeNotifier {
       }
     }
     if (type == 'trade_opened' || type == 'trade_result' || type == 'trade_expired') {
+      if (!_ownsAccountEvent(event)) return;
       final trade = event['trade'];
       if (trade is Map) {
         final parsed = DemoTrade.fromJson(Map<String, dynamic>.from(trade));
@@ -267,12 +268,19 @@ class TradingController extends ChangeNotifier {
       notifyListeners();
     }
     if (type == 'balance_updated' && event['balance'] is num) {
-      if (event['user_id'] == null || event['user_id'] == userId) {
-        _balanceEpoch++;
-        balance = (event['balance'] as num).toDouble();
-        notifyListeners();
-      }
+      if (!_ownsAccountEvent(event)) return;
+      _balanceEpoch++;
+      balance = (event['balance'] as num).toDouble();
+      notifyListeners();
     }
+  }
+
+  bool _ownsAccountEvent(Map<String, dynamic> event) {
+    final id = userId;
+    if (id == null || id.isEmpty) return false;
+    final owner = event['user_id'] ??
+        (event['trade'] is Map ? (event['trade'] as Map)['user_id'] : null);
+    return owner == id;
   }
 
   void _upsert(DemoTrade trade) {

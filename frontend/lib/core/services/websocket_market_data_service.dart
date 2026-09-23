@@ -12,11 +12,14 @@ class WebSocketMarketDataService implements MarketDataService {
   WebSocketMarketDataService({
     String? httpBase,
     String? wsUrl,
+    Future<String?> Function()? tokenProvider,
   })  : httpBase = httpBase ?? AppConstants.apiBase,
-        wsUrl = wsUrl ?? AppConstants.marketWsUrl;
+        wsUrl = wsUrl ?? AppConstants.marketWsUrl,
+        _tokenProvider = tokenProvider;
 
   final String httpBase;
   final String wsUrl;
+  final Future<String?> Function()? _tokenProvider;
 
   WebSocketChannel? _channel;
   final _candles = StreamController<MarketCandle>.broadcast();
@@ -52,10 +55,7 @@ class WebSocketMarketDataService implements MarketDataService {
         onError: (_) => _scheduleReconnect(),
         onDone: _scheduleReconnect,
       );
-      final user = _userId;
-      if (user != null) {
-        _send({'type': 'identify', 'user_id': user});
-      }
+      await _identifyCurrentUser();
       for (final asset in _subscribed) {
         _send({'type': 'subscribe', 'asset': asset});
       }
@@ -107,10 +107,16 @@ class WebSocketMarketDataService implements MarketDataService {
     _channel = null;
   }
 
+  Future<void> _identifyCurrentUser() async {
+    final token = await _tokenProvider?.call();
+    if (token == null || token.isEmpty) return;
+    _send({'type': 'identify', 'token': token});
+  }
+
   @override
   Future<void> identify(String userId) async {
     _userId = userId;
-    _send({'type': 'identify', 'user_id': userId});
+    await _identifyCurrentUser();
   }
 
   @override

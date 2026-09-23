@@ -94,7 +94,14 @@ class Phase3Coordinator:
                 quote = self.market.quotes.get(trade["asset"])
                 price = quote.price if quote else trade["entry_price"]
             settled = self.trading.settle(trade["trade_id"], price)
-            await self._emit({"type": "trade_result", "trade": settled})
+            await self._emit(
+                {
+                    "type": "trade_result",
+                    "user_id": settled["user_id"],
+                    "asset": settled.get("asset"),
+                    "trade": settled,
+                }
+            )
             await self._emit(
                 {
                     "type": "balance_updated",

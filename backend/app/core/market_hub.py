@@ -8,6 +8,22 @@ from fastapi import WebSocket
 from market_engine.models.candle import Candle
 from market_engine.models.tick import Tick
 
+ACCOUNT_EVENT_TYPES = frozenset(
+    {"trade_opened", "trade_result", "trade_expired", "balance_updated"}
+)
+
+
+def event_owner(payload: dict[str, Any]) -> str | None:
+    owner = payload.get("user_id")
+    if isinstance(owner, str) and owner:
+        return owner
+    trade = payload.get("trade")
+    if isinstance(trade, dict):
+        nested = trade.get("user_id")
+        if isinstance(nested, str) and nested:
+            return nested
+    return None
+
 
 class MarketHub:
     def __init__(self) -> None:
@@ -77,16 +93,16 @@ class MarketHub:
     async def broadcast_event(self, payload: dict[str, Any]) -> None:
         if "reference_direction" in payload or payload.get("type") == "ground_truth":
             return
+        event_type = payload.get("type")
         asset = payload.get("asset") or (payload.get("trade") or {}).get("asset")
-        user_id = payload.get("user_id") or (payload.get("trade") or {}).get("user_id")
+        owner = event_owner(payload)
         stale: list[WebSocket] = []
         for websocket, assets in self._clients.items():
-            if asset and assets and asset not in assets:
-                if payload.get("type") not in {"balance_updated"}:
+            if event_type in ACCOUNT_EVENT_TYPES:
+                if not owner or self._users.get(websocket) != owner:
                     continue
-            if payload.get("type") == "balance_updated":
-                if self._users.get(websocket) not in {None, user_id}:
-                    continue
+            elif asset and assets and asset not in assets:
+                continue
             try:
                 await websocket.send_text(json.dumps(payload))
             except Exception:

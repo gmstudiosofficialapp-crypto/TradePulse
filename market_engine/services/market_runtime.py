@@ -56,6 +56,8 @@ class MarketRuntime:
         }
         self.running = False
         self._task: asyncio.Task[None] | None = None
+        self._wake_lock: asyncio.Lock | None = None
+        self._last_step_at: datetime | None = None
         self._handlers: list[TickHandler] = []
         self.quotes: dict[str, Tick] = {}
         self.open_candles: dict[str, Candle] = {}
@@ -123,6 +125,7 @@ class MarketRuntime:
             self.session_open.setdefault(stream.config.symbol, seed_tick.price)
             if stream.config.symbol == BTC_SYMBOL:
                 self.btc_future_book.sync(stream, moment)
+        self._last_step_at = moment
 
     def btc_future_snapshot(self) -> dict:
         return self.btc_future_book.snapshot(self.open_candles.get(BTC_SYMBOL))
@@ -163,11 +166,63 @@ class MarketRuntime:
                     events.append(self._advance(stream, stamp))
                 continue
             events.append(self._advance(stream, now))
+        if events:
+            self._last_step_at = events[-1].tick.timestamp
         return events
 
+    def _tick_interval_seconds(self) -> float:
+        interval_ms = min(
+            (stream.config.tick_interval_ms for stream in self.streams.values()),
+            default=self.settings.default_tick_interval_ms,
+        )
+        return max(interval_ms / 1000, 0.05)
+
+    def loop_alive(self) -> bool:
+        return bool(self.running and self._task is not None and not self._task.done())
+
+    def is_stale(self, now: datetime | None = None) -> bool:
+        moment = now or datetime.now(timezone.utc)
+        if moment.tzinfo is None:
+            moment = moment.replace(tzinfo=timezone.utc)
+        else:
+            moment = moment.astimezone(timezone.utc)
+        if not self.quotes:
+            return True
+        latest = self._last_step_at
+        for tick in self.quotes.values():
+            stamp = tick.timestamp
+            if stamp.tzinfo is None:
+                stamp = stamp.replace(tzinfo=timezone.utc)
+            if latest is None or stamp > latest:
+                latest = stamp
+        if latest is None:
+            return True
+        max_age = max(2.0, self._tick_interval_seconds() * 5)
+        return (moment - latest).total_seconds() > max_age
+
+    async def ensure_awake(self, now: datetime | None = None) -> None:
+        """Wake the single shared loop and reconcile wall-clock market state."""
+        if self._wake_lock is None:
+            self._wake_lock = asyncio.Lock()
+        async with self._wake_lock:
+            moment = now or datetime.now(timezone.utc)
+            if self.is_stale(moment) or not self.quotes:
+                if not self.quotes:
+                    self.warmup(moment)
+                self.step(moment)
+            await self.start()
+
     async def start(self) -> None:
-        if self.running:
+        if self.loop_alive():
             return
+        if self._task is not None and not self._task.done():
+            self.running = False
+            self._task.cancel()
+            try:
+                await self._task
+            except asyncio.CancelledError:
+                pass
+        self._task = None
         if not self.quotes:
             self.warmup()
         self.running = True

@@ -2,7 +2,14 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
 
 from app.core.firebase_auth import AuthUser, FirebaseUser
-from app.core.runtime import get_admin, get_coordinator, get_runtime, get_signals, get_trading
+from app.core.runtime import (
+    ensure_market_runtime,
+    get_admin,
+    get_coordinator,
+    get_runtime,
+    get_signals,
+    get_trading,
+)
 from app.core.safety import LiveTradingDisabledError, execute_live_trade
 
 router = APIRouter(prefix="/api", tags=["demo"])
@@ -129,7 +136,7 @@ async def open_demo_trade(body: OpenTradeBody, user: AuthUser) -> dict:
         except LiveTradingDisabledError as exc:
             raise HTTPException(status_code=403, detail=str(exc)) from exc
     _bootstrap(user)
-    runtime = get_runtime()
+    runtime = await ensure_market_runtime()
     if body.asset not in runtime.streams:
         raise HTTPException(status_code=404, detail="Unknown OTC asset")
     quote = runtime.quotes.get(body.asset)
@@ -146,7 +153,14 @@ async def open_demo_trade(body: OpenTradeBody, user: AuthUser) -> dict:
         )
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
-    await get_coordinator()._emit({"type": "trade_opened", "trade": trade, "asset": trade["asset"]})
+    await get_coordinator()._emit(
+        {
+            "type": "trade_opened",
+            "user_id": user.uid,
+            "asset": trade["asset"],
+            "trade": trade,
+        }
+    )
     await get_coordinator()._emit(
         {"type": "balance_updated", "user_id": user.uid, "balance": get_trading().balance(user.uid)}
     )

@@ -2,10 +2,12 @@ from __future__ import annotations
 
 import json
 
-from fastapi import APIRouter, WebSocket, WebSocketDisconnect
+from fastapi import APIRouter, HTTPException, WebSocket, WebSocketDisconnect
 
+from app.core.firebase_admin_app import FirebaseAdminConfigError
+from app.core.firebase_auth import verify_id_token
 from app.core.market_hub import MarketHub, PrivateReferenceHub
-from app.core.runtime import get_coordinator, get_runtime
+from app.core.runtime import ensure_market_runtime, get_coordinator, get_runtime
 from market_engine.config.assets import ASSET_CONFIGS
 
 router = APIRouter()
@@ -35,14 +37,14 @@ def attach_hub() -> MarketHub:
 
 @router.websocket("/ws/market")
 async def market_socket(websocket: WebSocket) -> None:
-    runtime = get_runtime()
+    runtime = await ensure_market_runtime()
     await websocket.accept()
     hub.connect(websocket)
     await hub.send(
         websocket,
         {
             "type": "status",
-            "state": "LIVE_SIMULATION" if runtime.running else "MARKET_OFFLINE",
+            "state": "LIVE_SIMULATION" if runtime.loop_alive() else "MARKET_OFFLINE",
             "simulated": True,
             "message": "Simulated OTC market. Not live-money trading.",
         },
@@ -64,15 +66,34 @@ async def market_socket(websocket: WebSocket) -> None:
                 await hub.send(websocket, {"type": "pong"})
                 continue
             if kind == "identify":
-                user_id = str(message.get("user_id") or "").strip().lower()
-                if user_id:
-                    hub.identify(websocket, user_id)
-                    await hub.send(websocket, {"type": "identified", "user_id": user_id})
+                token = str(
+                    message.get("token") or message.get("access_token") or ""
+                ).strip()
+                if not token:
+                    await hub.send(
+                        websocket,
+                        {"type": "error", "message": "Authorization token required"},
+                    )
+                    continue
+                try:
+                    user = verify_id_token(token)
+                except FirebaseAdminConfigError as exc:
+                    await hub.send(websocket, {"type": "error", "message": str(exc)})
+                    continue
+                except HTTPException as exc:
+                    await hub.send(
+                        websocket,
+                        {"type": "error", "message": str(exc.detail)},
+                    )
+                    continue
+                hub.identify(websocket, user.uid)
+                await hub.send(websocket, {"type": "identified", "user_id": user.uid})
                 continue
             if kind == "subscribe":
                 if asset not in ASSET_CONFIGS:
                     await hub.send(websocket, {"type": "error", "message": "Unknown OTC asset"})
                     continue
+                runtime = await ensure_market_runtime()
                 hub.subscribe(websocket, asset)
                 await hub.send(websocket, {"type": "subscribed", "asset": asset})
                 quote = runtime.snapshot_quote(asset)

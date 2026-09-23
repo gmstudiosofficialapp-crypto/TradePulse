@@ -35,7 +35,7 @@ Future<void> main() async {
   runApp(
     TradePulseApp(
       authService: auth,
-      marketService: WebSocketMarketDataService(),
+      marketService: WebSocketMarketDataService(tokenProvider: auth.idToken),
     ),
   );
 }

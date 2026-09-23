@@ -22,6 +22,12 @@ def get_runtime() -> MarketRuntime:
     return _runtime
 
 
+async def ensure_market_runtime() -> MarketRuntime:
+    runtime = get_runtime()
+    await runtime.ensure_awake()
+    return runtime
+
+
 def set_phase3(
     signals: SignalEngine,
     trading: DemoTradingEngine,
