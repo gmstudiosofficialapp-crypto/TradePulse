@@ -60,10 +60,17 @@
     (function () {
       var baseline = Math.max(window.innerHeight || 0, document.documentElement.clientHeight || 0);
       var landscape = window.innerWidth > window.innerHeight;
+      var timer = null;
       function visualHeight() {
         var viewport = window.visualViewport;
         if (!viewport) return window.innerHeight || 0;
         return viewport.height + viewport.offsetTop;
+      }
+      function overlap() {
+        return Math.max(0, baseline - visualHeight());
+      }
+      function keyboardOpen() {
+        return overlap() > 80;
       }
       function apply() {
         document.documentElement.style.setProperty(
@@ -71,49 +78,54 @@
           Math.round(baseline) + 'px'
         );
       }
-      function overlap() {
-        return Math.max(0, baseline - visualHeight());
-      }
-      window.__tpLayoutHeight = function () { return baseline; };
-      window.__tpKeyboardOverlap = function () { return overlap(); };
-      window.__tpSyncViewport = function () {
+      function refreshBaseline() {
         var nowLandscape = window.innerWidth > window.innerHeight;
         if (nowLandscape !== landscape) {
           landscape = nowLandscape;
           baseline = Math.max(window.innerHeight || 0, document.documentElement.clientHeight || 0);
         }
-        var visible = visualHeight();
-        var open = baseline - visible > 80;
-        if (!open) {
-          var measured = Math.max(window.innerHeight || 0, document.documentElement.clientHeight || 0, visible);
+        if (!keyboardOpen()) {
+          var measured = Math.max(
+            window.innerHeight || 0,
+            document.documentElement.clientHeight || 0,
+            visualHeight()
+          );
           if (measured > baseline) baseline = measured;
-          window.scrollTo(0, 0);
         }
         apply();
         return baseline;
-      };
+      }
+      window.__tpLayoutHeight = function () { return baseline; };
+      window.__tpKeyboardOverlap = function () { return overlap(); };
+      window.__tpSyncViewport = function () { return refreshBaseline(); };
       window.__tpReleaseKeyboard = function () {
-        var visible = visualHeight();
-        if (baseline - visible > 40) return;
-        var active = document.activeElement;
-        if (active && active !== document.body && active.blur) {
-          active.blur();
+        if (keyboardOpen()) return;
+        if (window.scrollX || window.scrollY) {
+          window.scrollTo(0, 0);
         }
-        window.scrollTo(0, 0);
-        window.__tpSyncViewport();
+        refreshBaseline();
       };
       apply();
-      window.addEventListener('resize', window.__tpSyncViewport);
-      window.addEventListener('orientationchange', window.__tpSyncViewport);
-      window.addEventListener('pageshow', window.__tpSyncViewport);
-      if (window.visualViewport) {
-        window.visualViewport.addEventListener('resize', function () {
-          var visible = visualHeight();
-          if (visible >= baseline - 40) {
-            window.__tpReleaseKeyboard();
+      function onViewportChange() {
+        if (timer) window.clearTimeout(timer);
+        timer = window.setTimeout(function () {
+          timer = null;
+          refreshBaseline();
+          if (!keyboardOpen() && (window.scrollX || window.scrollY)) {
+            window.scrollTo(0, 0);
           }
-          window.__tpSyncViewport();
-        });
+        }, 80);
+      }
+      window.addEventListener('resize', onViewportChange);
+      window.addEventListener('orientationchange', function () {
+        landscape = window.innerWidth > window.innerHeight;
+        baseline = Math.max(window.innerHeight || 0, document.documentElement.clientHeight || 0);
+        apply();
+      });
+      window.addEventListener('pageshow', refreshBaseline);
+      if (window.visualViewport) {
+        window.visualViewport.addEventListener('resize', onViewportChange);
+        window.visualViewport.addEventListener('scroll', onViewportChange);
       }
     })();
     window.__tpInstallPrompt = null;

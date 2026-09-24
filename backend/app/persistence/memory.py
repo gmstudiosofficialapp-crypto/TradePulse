@@ -3,13 +3,18 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from threading import Lock
 
+SIGNUP_LIVE_BONUS = 10.0
+
+
 class MemoryAccountStore:
     def __init__(self, initial: float) -> None:
         self.initial = initial
         self.initial_live = 0.0
         self._balances: dict[str, float] = {}
         self._live_balances: dict[str, float] = {}
+        self._bonus_granted: dict[str, bool] = {}
         self._users: dict[str, dict] = {}
+        self._lock = Lock()
 
     def get_balance(self, user_id: str) -> float:
         return self._balances.setdefault(user_id, self.initial)
@@ -24,27 +29,50 @@ class MemoryAccountStore:
         self._live_balances[user_id] = round(amount, 2)
 
     def ensure_user(self, user_id: str, email: str = "", name: str = "") -> dict:
-        existing = self._users.get(user_id)
-        if existing is not None:
-            if email:
-                existing["email"] = email
-            if name:
-                existing["displayName"] = name
-            existing["updatedAt"] = datetime.now(timezone.utc).isoformat()
-            return existing
-        now = datetime.now(timezone.utc).isoformat()
-        row = {
-            "uid": user_id,
-            "email": email,
-            "displayName": name,
-            "status": "active",
-            "createdAt": now,
-            "updatedAt": now,
-        }
-        self._users[user_id] = row
-        self.get_balance(user_id)
-        self.get_live_balance(user_id)
-        return row
+        with self._lock:
+            existing = self._users.get(user_id)
+            account_exists = user_id in self._balances or user_id in self._live_balances
+            now = datetime.now(timezone.utc).isoformat()
+            if existing is not None or account_exists:
+                if existing is None:
+                    existing = {
+                        "uid": user_id,
+                        "email": email,
+                        "displayName": name,
+                        "status": "active",
+                        "createdAt": now,
+                        "updatedAt": now,
+                    }
+                    self._users[user_id] = existing
+                else:
+                    if email:
+                        existing["email"] = email
+                    if name:
+                        existing["displayName"] = name
+                    existing["updatedAt"] = now
+                granted = bool(self._bonus_granted.get(user_id))
+                return {
+                    **existing,
+                    "signup_bonus_granted": granted,
+                    "signup_bonus_just_granted": False,
+                }
+            row = {
+                "uid": user_id,
+                "email": email,
+                "displayName": name,
+                "status": "active",
+                "createdAt": now,
+                "updatedAt": now,
+            }
+            self._users[user_id] = row
+            self._balances[user_id] = round(self.initial, 2)
+            self._live_balances[user_id] = SIGNUP_LIVE_BONUS
+            self._bonus_granted[user_id] = True
+            return {
+                **row,
+                "signup_bonus_granted": True,
+                "signup_bonus_just_granted": True,
+            }
 
     def get_user(self, user_id: str) -> dict | None:
         return self._users.get(user_id)

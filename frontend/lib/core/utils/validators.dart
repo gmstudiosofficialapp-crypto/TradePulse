@@ -1,3 +1,5 @@
+import '../../models/live_wallet_models.dart';
+
 class Validators {
   static final _email = RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$');
 
@@ -38,6 +40,64 @@ class Validators {
       return 'Use letters and numbers';
     }
     return null;
+  }
+
+  static const withdrawMin = 50.0;
+  static const withdrawMax = 10000.0;
+  static const withdrawMinMessage = r'Minimum withdrawal amount is $50.00.';
+  static const withdrawMaxMessage = r'Maximum withdrawal amount is $10,000.00.';
+  static const withdrawInsufficient = 'Insufficient Live Balance.';
+  static const withdrawMethodRequired = 'Please select a payment method.';
+  static const withdrawAddressRequired = 'Please enter your payment address.';
+  static const withdrawBtcInvalid = 'Please enter a valid Bitcoin wallet address.';
+  static const withdrawTrc20Invalid =
+      'Please enter a valid USDT TRC20 wallet address.';
+  static const withdrawEthInvalid =
+      'Please enter a valid Ethereum ERC20 wallet address.';
+  static const withdrawDepositRequired =
+      '⚠️ Your account is currently not eligible for withdrawal.\n'
+      'Please deposit a minimum of \$50 before making a withdrawal.\n'
+      'Once the \$50 deposit is completed, you will be able to submit a withdrawal request.';
+
+  static final _btcLegacy = RegExp(r'^[13][1-9A-HJ-NP-Za-km-z]{25,33}$');
+  static final _btcBech32 = RegExp(r'^bc1[qpzry9x8gf2tvdw0s3jn54khce6mua7l]{11,71}$');
+  static final _tron = RegExp(r'^T[1-9A-HJ-NP-Za-km-z]{33}$');
+  static final _eth = RegExp(r'^0x[0-9a-fA-F]{40}$');
+
+  static double? parseMoney(String? value) {
+    if (value == null) return null;
+    return double.tryParse(value.replaceAll(',', '').replaceAll('\$', '').trim());
+  }
+
+  static String? withdrawAmount(String? value) {
+    if (value == null || value.trim().isEmpty) {
+      return 'Please enter a withdrawal amount.';
+    }
+    final parsed = parseMoney(value);
+    if (parsed == null) {
+      return 'Please enter a valid withdrawal amount.';
+    }
+    if (parsed < withdrawMin) return withdrawMinMessage;
+    if (parsed > withdrawMax) return withdrawMaxMessage;
+    return null;
+  }
+
+  static String? withdrawAddress(String? value, LivePaymentAsset? method) {
+    if (method == null) return withdrawMethodRequired;
+    if (value == null || value.trim().isEmpty) return withdrawAddressRequired;
+    final address = value.trim();
+    return switch (method) {
+      LivePaymentAsset.btc =>
+        _isBtcAddress(address) ? null : withdrawBtcInvalid,
+      LivePaymentAsset.usdtTrc20 =>
+        _tron.hasMatch(address) ? null : withdrawTrc20Invalid,
+      LivePaymentAsset.eth => _eth.hasMatch(address) ? null : withdrawEthInvalid,
+    };
+  }
+
+  static bool _isBtcAddress(String address) {
+    return _btcLegacy.hasMatch(address) ||
+        _btcBech32.hasMatch(address.toLowerCase());
   }
 
   static String? liveDepositAmount(String? value) {

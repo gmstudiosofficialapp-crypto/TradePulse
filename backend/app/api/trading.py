@@ -1,3 +1,5 @@
+from typing import Any
+
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
 
@@ -12,6 +14,7 @@ from app.core.runtime import (
 )
 from app.services.demo_trading import BOOK_LIVE
 from app.services.leaderboard import build_daily_leaderboard
+from app.services.withdraw import preview_withdrawal
 
 router = APIRouter(prefix="/api", tags=["demo"])
 
@@ -26,6 +29,13 @@ class OpenTradeBody(BaseModel):
 
 class DemoCreditBody(BaseModel):
     amount: float = Field(gt=0, le=1_000_000)
+
+
+class WithdrawPreviewBody(BaseModel):
+    amount: Any = None
+    method: Any = None
+    address: Any = None
+    user_id: Any = None
 
 
 class ProfileBody(BaseModel):
@@ -44,18 +54,12 @@ class ProfileBody(BaseModel):
     postalCode: str | None = None
 
 
-def _bootstrap(user: FirebaseUser) -> None:
-    get_trading().ensure_account(user.uid, email=user.email, name=user.name)
+def _bootstrap(user: FirebaseUser) -> dict:
+    return get_trading().ensure_account(user.uid, email=user.email, name=user.name)
 
 
-@router.get("/config")
-def public_config() -> dict:
-    return get_admin().public_view()
-
-
-@router.get("/me")
-def get_me(user: AuthUser) -> dict:
-    _bootstrap(user)
+def _account_payload(user: FirebaseUser, init: dict | None = None) -> dict:
+    state = init or _bootstrap(user)
     profile = get_trading().profile(user.uid) or {
         "uid": user.uid,
         "email": user.email,
@@ -65,14 +69,26 @@ def get_me(user: AuthUser) -> dict:
         "user": profile,
         "balance": get_trading().balance(user.uid),
         "live_balance": get_trading().live_balance(user.uid),
+        "signup_bonus_granted": bool(state.get("signup_bonus_granted")),
+        "signup_bonus_just_granted": bool(state.get("signup_bonus_just_granted")),
         "simulated": True,
         "account_type": "DEMO",
     }
 
 
+@router.get("/config")
+def public_config() -> dict:
+    return get_admin().public_view()
+
+
+@router.get("/me")
+def get_me(user: AuthUser) -> dict:
+    return _account_payload(user)
+
+
 @router.post("/me")
 def bootstrap_me(user: AuthUser) -> dict:
-    return get_me(user)
+    return _account_payload(user, _bootstrap(user))
 
 
 @router.patch("/me")
@@ -161,6 +177,21 @@ def live_transactions(user: AuthUser) -> dict:
         if item.get("account_type") == BOOK_LIVE
     ]
     return {"transactions": rows, "account_type": BOOK_LIVE}
+
+
+@router.post("/live/withdraw/preview")
+def preview_live_withdraw(body: WithdrawPreviewBody, user: AuthUser) -> dict:
+    _bootstrap(user)
+    result = preview_withdrawal(
+        user_id=user.uid,
+        live_balance=get_trading().live_balance(user.uid),
+        amount=body.amount,
+        method=body.method,
+        address=body.address,
+    )
+    if not result["form_valid"]:
+        raise HTTPException(status_code=400, detail=result["message"])
+    return result
 
 
 @router.get("/leaderboard")

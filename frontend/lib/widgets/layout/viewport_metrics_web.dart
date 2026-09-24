@@ -11,25 +11,24 @@ external JSNumber? _jsKeyboardOverlap();
 @JS('__tpSyncViewport')
 external void _jsSyncViewport();
 
+@JS('__tpReleaseKeyboard')
+external void _jsReleaseKeyboard();
+
 void Function()? listenViewport(void Function() onChange) {
-  void notify() => onChange();
-  final handler = (web.Event _) {
-    pinHost();
-    notify();
-  }.toJS;
+  void notify(web.Event _) => onChange();
+  final handler = notify.toJS;
   web.window.addEventListener('resize', handler);
   web.window.addEventListener('orientationchange', handler);
   web.window.addEventListener('pageshow', handler);
-  web.document.addEventListener('focusout', handler);
   final viewport = web.window.visualViewport;
   viewport?.addEventListener('resize', handler);
-  pinHost();
+  viewport?.addEventListener('scroll', handler);
   return () {
     web.window.removeEventListener('resize', handler);
     web.window.removeEventListener('orientationchange', handler);
     web.window.removeEventListener('pageshow', handler);
-    web.document.removeEventListener('focusout', handler);
     viewport?.removeEventListener('resize', handler);
+    viewport?.removeEventListener('scroll', handler);
   };
 }
 
@@ -46,6 +45,12 @@ void pinHost() {
     style.height = '100%';
     style.setProperty('min-height', '100%');
   }
+}
+
+void releaseKeyboard() {
+  try {
+    _jsReleaseKeyboard();
+  } catch (_) {}
 }
 
 double? windowInnerHeight() {

@@ -83,7 +83,7 @@ def test_demo_trade_api_uses_server_price() -> None:
             json={
                 "asset": "BTC/USD-OTC",
                 "direction": "BUY",
-                "stake": 10,
+                "stake": 11,
                 "live": True,
             },
         )

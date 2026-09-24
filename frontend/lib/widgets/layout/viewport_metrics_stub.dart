@@ -2,6 +2,8 @@ void Function()? listenViewport(void Function() onChange) => null;
 
 void pinHost() {}
 
+void releaseKeyboard() {}
+
 double? windowInnerHeight() => null;
 
 double? largeViewportHeight() => null;

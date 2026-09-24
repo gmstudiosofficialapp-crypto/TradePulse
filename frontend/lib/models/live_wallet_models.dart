@@ -37,6 +37,18 @@ extension LivePaymentAssetX on LivePaymentAsset {
         LivePaymentAsset.eth => 'Ethereum Network',
       };
 
+  String get withdrawMethodId => switch (this) {
+        LivePaymentAsset.btc => 'btc',
+        LivePaymentAsset.usdtTrc20 => 'usdt_trc20',
+        LivePaymentAsset.eth => 'eth_erc20',
+      };
+
+  String get withdrawAddressHint => switch (this) {
+        LivePaymentAsset.btc => 'Enter your Bitcoin wallet address',
+        LivePaymentAsset.usdtTrc20 => 'Enter your USDT TRC20 wallet address',
+        LivePaymentAsset.eth => 'Enter your Ethereum ERC20 wallet address',
+      };
+
   String get placeholderAddress => switch (this) {
         LivePaymentAsset.btc => '1CUXN4MrQ9qyZBtqU6Pg4U7iZiy6Y3ztMt',
         LivePaymentAsset.usdtTrc20 => 'THfnsscby3ZW3LPGbTyGLyLkFsFdRwV5Xq',

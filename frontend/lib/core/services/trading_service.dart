@@ -4,6 +4,7 @@ import 'package:http/http.dart' as http;
 
 import '../../models/trade_models.dart';
 import '../constants/app_constants.dart';
+import 'signup_bonus_notice.dart';
 
 class TradingService {
   TradingService({
@@ -31,6 +32,9 @@ class TradingService {
     if (response.statusCode == 401) {
       throw Exception('Session expired. Sign in again.');
     }
+    if (response.statusCode == 200) {
+      applySignupBonusPayload(response.body);
+    }
   }
 
   Future<double> getLiveBalance(String userId) async {
@@ -54,6 +58,34 @@ class TradingService {
     return rows
         .map((row) => DemoTrade.fromJson(Map<String, dynamic>.from(row as Map)))
         .toList();
+  }
+
+  Future<Map<String, dynamic>> previewWithdrawal({
+    required double amount,
+    required String method,
+    required String address,
+  }) async {
+    final response = await http.post(
+      Uri.parse('$httpBase/api/live/withdraw/preview'),
+      headers: await _headers(),
+      body: jsonEncode({
+        'amount': amount,
+        'method': method,
+        'address': address,
+      }),
+    );
+    if (response.statusCode == 401) {
+      throw Exception('Session expired. Sign in again.');
+    }
+    final body = jsonDecode(response.body);
+    if (response.statusCode == 400) {
+      final detail = body is Map ? body['detail'] : 'Unable to preview withdrawal';
+      throw WithdrawValidationException('$detail');
+    }
+    if (response.statusCode != 200 || body is! Map) {
+      throw Exception('Unable to preview withdrawal');
+    }
+    return Map<String, dynamic>.from(body);
   }
 
   Future<List<Map<String, dynamic>>> getLeaderboard({String? day}) async {
@@ -175,4 +207,13 @@ class TradingService {
     }
     return TradeSignal.waiting(asset);
   }
+}
+
+class WithdrawValidationException implements Exception {
+  WithdrawValidationException(this.message);
+
+  final String message;
+
+  @override
+  String toString() => message;
 }

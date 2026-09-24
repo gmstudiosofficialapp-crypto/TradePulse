@@ -475,9 +475,13 @@ void main() {
     expect(find.text(r'$0.00'), findsWidgets);
     expect(find.text('Insufficient Balance'), findsOneWidget);
     expect(find.text('Withdrawal Information'), findsOneWidget);
-    expect(find.text('Unavailable'), findsOneWidget);
-    final button = tester.widget<FilledButton>(find.widgetWithText(FilledButton, 'Withdraw'));
-    expect(button.onPressed, isNull);
+    await tester.scrollUntilVisible(
+      find.text('Submit Withdrawal'),
+      240,
+      scrollable: find.byType(Scrollable).first,
+    );
+    expect(find.text('Submit Withdrawal'), findsOneWidget);
+    expect(find.text('Payment Method'), findsOneWidget);
   });
 
   testWidgets('demo balance card is unchanged in value', (tester) async {

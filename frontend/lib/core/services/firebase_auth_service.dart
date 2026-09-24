@@ -7,6 +7,7 @@ import '../../models/user_profile.dart';
 import '../constants/app_constants.dart';
 import '../routes/app_routes.dart';
 import 'auth_service.dart';
+import 'signup_bonus_notice.dart';
 
 class FirebaseAuthService implements AuthService {
   FirebaseAuthService({FirebaseAuth? auth, http.Client? httpClient})
@@ -217,13 +218,16 @@ class FirebaseAuthService implements AuthService {
     final token = await idToken();
     if (token == null) return;
     try {
-      await _http.post(
+      final response = await _http.post(
         Uri.parse('${AppConstants.apiBase}/api/me'),
         headers: {
           'Content-Type': 'application/json',
           'Authorization': 'Bearer $token',
         },
       );
+      if (response.statusCode == 200) {
+        applySignupBonusPayload(response.body);
+      }
     } catch (_) {
       // Account bootstrap is retried on the next authenticated API call.
     }

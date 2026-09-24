@@ -87,6 +87,18 @@ class TradingController extends ChangeNotifier {
   Future<List<Map<String, dynamic>>> loadLeaderboard() =>
       _service.getLeaderboard();
 
+  Future<Map<String, dynamic>> previewWithdrawal({
+    required double amount,
+    required String method,
+    required String address,
+  }) {
+    return _service.previewWithdrawal(
+      amount: amount,
+      method: method,
+      address: address,
+    );
+  }
+
   Future<void> restoreDemoFunds() async {
     final needed = 10000 - demoDisplayBalance;
     if (needed > 0) await addDemoFunds(needed);

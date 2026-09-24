@@ -49,6 +49,9 @@ def test_user_and_account_created() -> None:
         body = created.json()
         assert body["user"]["uid"] == "uid1"
         assert body["balance"] == 10000.0
+        assert body["live_balance"] == 10.0
+        assert body["signup_bonus_granted"] is True
+        assert body["signup_bonus_just_granted"] is True
         again = client.get(
             "/api/demo/balance",
             headers={"Authorization": "Bearer uid1|one@example.com"},

@@ -10,13 +10,29 @@ import '../../widgets/cards/asset_grid.dart';
 import '../../widgets/cards/live_cash_action_bar.dart';
 import '../../widgets/cards/quick_action_card.dart';
 import '../../widgets/feedback/empty_state.dart';
+import '../../widgets/feedback/signup_bonus_dialog.dart';
 import '../../widgets/layout/entrance.dart';
 import '../../widgets/layout/responsive_body.dart';
 import '../../widgets/layout/section_header.dart';
 import '../../widgets/pwa/pwa_install_banner.dart';
 
-class HomeScreen extends StatelessWidget {
+class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
+
+  @override
+  State<HomeScreen> createState() => _HomeScreenState();
+}
+
+class _HomeScreenState extends State<HomeScreen> {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      if (!AppScope.auth(context).takeSignupBonusNotice()) return;
+      SignupBonusDialog.show(context);
+    });
+  }
 
   @override
   Widget build(BuildContext context) {

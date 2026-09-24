@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 
 import '../../models/user_profile.dart';
 import 'auth_service.dart';
+import 'signup_bonus_notice.dart';
 
 class AuthController extends ChangeNotifier {
   AuthController(this._service);
@@ -34,8 +35,11 @@ class AuthController extends ChangeNotifier {
 
   Future<void> logout() async {
     await _service.logout();
+    SignupBonusNotice.instance.clearSession();
     notifyListeners();
   }
+
+  bool takeSignupBonusNotice() => SignupBonusNotice.instance.take();
 
   Future<void> resetPassword({required String email}) {
     return _service.resetPassword(email: email);

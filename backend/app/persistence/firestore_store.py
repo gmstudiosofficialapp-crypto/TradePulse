@@ -11,6 +11,9 @@ def _now() -> str:
     return datetime.now(timezone.utc).isoformat()
 
 
+SIGNUP_LIVE_BONUS = 10.0
+
+
 class FirestoreAccountStore:
     def __init__(self, db, initial: float) -> None:
         self._db = db
@@ -60,7 +63,6 @@ class FirestoreAccountStore:
         user_ref = self._user_ref(user_id)
         account_ref = self._account_ref(user_id)
         user_snap = user_ref.get()
-        account_snap = account_ref.get()
         now = _now()
         if user_snap.exists:
             row = user_snap.to_dict() or {}
@@ -81,17 +83,32 @@ class FirestoreAccountStore:
                 "updatedAt": now,
             }
             user_ref.set(row)
-        if not account_snap.exists:
-            account_ref.set(
-                {
-                    "uid": user_id,
-                    "balance": self.initial,
-                    "live_balance": 0.0,
-                    "createdAt": now,
-                    "updatedAt": now,
+
+        @firestore.transactional
+        def _ensure_account(txn) -> dict:
+            snap = account_ref.get(transaction=txn)
+            if snap.exists:
+                data = snap.to_dict() or {}
+                return {
+                    "signup_bonus_granted": bool(data.get("signup_bonus_granted")),
+                    "signup_bonus_just_granted": False,
                 }
-            )
-        return row
+            payload = {
+                "uid": user_id,
+                "balance": self.initial,
+                "live_balance": SIGNUP_LIVE_BONUS,
+                "signup_bonus_granted": True,
+                "createdAt": now,
+                "updatedAt": now,
+            }
+            txn.set(account_ref, payload)
+            return {
+                "signup_bonus_granted": True,
+                "signup_bonus_just_granted": True,
+            }
+
+        bonus = _ensure_account(self._db.transaction())
+        return {**row, **bonus}
 
     def get_user(self, user_id: str) -> dict | None:
         snap = self._user_ref(user_id).get()
