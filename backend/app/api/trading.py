@@ -10,7 +10,8 @@ from app.core.runtime import (
     get_signals,
     get_trading,
 )
-from app.core.safety import LiveTradingDisabledError, execute_live_trade
+from app.services.demo_trading import BOOK_LIVE
+from app.services.leaderboard import build_daily_leaderboard
 
 router = APIRouter(prefix="/api", tags=["demo"])
 
@@ -63,6 +64,7 @@ def get_me(user: AuthUser) -> dict:
     return {
         "user": profile,
         "balance": get_trading().balance(user.uid),
+        "live_balance": get_trading().live_balance(user.uid),
         "simulated": True,
         "account_type": "DEMO",
     }
@@ -128,13 +130,49 @@ def demo_transactions(user: AuthUser) -> dict:
     return {"transactions": get_trading().transactions.list_for_user(user.uid), "simulated": True}
 
 
+@router.get("/live/balance")
+def live_balance(user: AuthUser) -> dict:
+    _bootstrap(user)
+    return {
+        "user_id": user.uid,
+        "balance": get_trading().live_balance(user.uid),
+        "account_type": BOOK_LIVE,
+    }
+
+
+@router.get("/live/trades")
+def live_trades(user: AuthUser) -> dict:
+    _bootstrap(user)
+    return {"trades": get_trading().listed_trades(user.uid, BOOK_LIVE), "account_type": BOOK_LIVE}
+
+
+@router.get("/live/statistics")
+def live_statistics(user: AuthUser) -> dict:
+    _bootstrap(user)
+    return get_trading().statistics(user.uid, BOOK_LIVE)
+
+
+@router.get("/live/transactions")
+def live_transactions(user: AuthUser) -> dict:
+    _bootstrap(user)
+    rows = [
+        item
+        for item in get_trading().transactions.list_for_user(user.uid)
+        if item.get("account_type") == BOOK_LIVE
+    ]
+    return {"transactions": rows, "account_type": BOOK_LIVE}
+
+
+@router.get("/leaderboard")
+def daily_leaderboard(day: str | None = None) -> dict:
+    try:
+        return build_daily_leaderboard(day)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
 @router.post("/demo/trades")
 async def open_demo_trade(body: OpenTradeBody, user: AuthUser) -> dict:
-    if body.live:
-        try:
-            execute_live_trade()
-        except LiveTradingDisabledError as exc:
-            raise HTTPException(status_code=403, detail=str(exc)) from exc
     _bootstrap(user)
     runtime = await ensure_market_runtime()
     if body.asset not in runtime.streams:
@@ -150,19 +188,27 @@ async def open_demo_trade(body: OpenTradeBody, user: AuthUser) -> dict:
             stake=body.stake,
             entry_price=quote.price,
             expiry_seconds=body.expiry_seconds,
+            live=body.live,
         )
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
+    book = trade.get("account_type") or "DEMO"
     await get_coordinator()._emit(
         {
             "type": "trade_opened",
             "user_id": user.uid,
             "asset": trade["asset"],
+            "account_type": book,
             "trade": trade,
         }
     )
     await get_coordinator()._emit(
-        {"type": "balance_updated", "user_id": user.uid, "balance": get_trading().balance(user.uid)}
+        {
+            "type": "balance_updated",
+            "user_id": user.uid,
+            "account_type": book,
+            "balance": get_trading().book_balance(user.uid, book),
+        }
     )
     return trade
 

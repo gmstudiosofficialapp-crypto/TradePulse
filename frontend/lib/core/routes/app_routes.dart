@@ -8,6 +8,7 @@ class AppRoutes {
   static const String markets = '/markets';
   static const String trade = '/trade';
   static const String history = '/history';
+  static const String leaderboard = '/leaderboard';
   static const String profile = '/profile';
   static const String settings = '/settings';
   static const String editProfile = '/edit-profile';

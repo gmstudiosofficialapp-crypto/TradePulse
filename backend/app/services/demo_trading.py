@@ -4,7 +4,6 @@ import threading
 import uuid
 from datetime import datetime, timedelta, timezone
 
-from app.core.safety import execute_live_trade
 from app.core.trading_settings import TradingSettings, payout_rate_for
 from app.persistence.memory import (
     MemoryAccountStore,
@@ -15,6 +14,12 @@ from app.persistence.memory import (
 
 
 HISTORY_LIMIT = 100
+BOOK_DEMO = "DEMO"
+BOOK_LIVE = "LIVE"
+
+
+def account_book(trade: dict) -> str:
+    return BOOK_LIVE if trade.get("account_type") == BOOK_LIVE else BOOK_DEMO
 
 
 def _utc(now: datetime | None) -> datetime:
@@ -84,6 +89,7 @@ class DemoTradingEngine:
         self._hot_ready = False
         self._overlay: dict[str, dict] = {}
         self._balance_cache: dict[str, float] = {}
+        self._live_balance_cache: dict[str, float] = {}
         self._persist_lock = threading.Lock()
 
     def balance(self, user_id: str) -> float:
@@ -92,16 +98,44 @@ class DemoTradingEngine:
             return cached
         return self.accounts.get_balance(user_id)
 
+    def live_balance(self, user_id: str) -> float:
+        cached = self._live_balance_cache.get(user_id)
+        if cached is not None:
+            return cached
+        getter = getattr(self.accounts, "get_live_balance", None)
+        if getter is None:
+            return 0.0
+        return getter(user_id)
+
+    def set_live_balance(self, user_id: str, amount: float) -> float:
+        after = round(amount, 2)
+        setter = getattr(self.accounts, "set_live_balance", None)
+        if setter is None:
+            raise ValueError("Live balance store is unavailable")
+        setter(user_id, after)
+        self._live_balance_cache[user_id] = after
+        return after
+
+    def book_balance(self, user_id: str, book: str) -> float:
+        if book == BOOK_LIVE:
+            return self.live_balance(user_id)
+        return self.balance(user_id)
+
     def open_snapshot(self) -> list[dict]:
         """Open trades kept in memory so expiry does not query Firestore per tick."""
         self._ensure_hot()
         return [dict(trade) for trade in self._hot_open.values()]
 
-    def listed_trades(self, user_id: str) -> list[dict]:
+    def listed_trades(self, user_id: str, account_type: str = BOOK_DEMO) -> list[dict]:
         rows = {item["trade_id"]: item for item in self.trades.list_for_user(user_id)}
         for trade_id, trade in self._overlay.items():
             if trade.get("user_id") == user_id:
                 rows[trade_id] = trade
+        rows = {
+            key: value
+            for key, value in rows.items()
+            if account_book(value) == account_type
+        }
         ordered = sorted(
             rows.values(),
             key=lambda item: (item.get("created_at", ""), item.get("trade_id", "")),
@@ -118,8 +152,12 @@ class DemoTradingEngine:
                 self._hot_open.setdefault(trade_id, dict(trade))
         self._hot_ready = True
 
-    def _trim_history(self, user_id: str) -> None:
-        rows = self.trades.list_for_user(user_id)
+    def _trim_history(self, user_id: str, account_type: str = BOOK_DEMO) -> None:
+        rows = [
+            row
+            for row in self.trades.list_for_user(user_id)
+            if account_book(row) == account_type
+        ]
         extra = len(rows) - HISTORY_LIMIT
         if extra <= 0:
             return
@@ -170,8 +208,7 @@ class DemoTradingEngine:
         live: bool = False,
         expiry_seconds: int | None = None,
     ) -> dict:
-        if live:
-            execute_live_trade()
+        book = BOOK_LIVE if live else BOOK_DEMO
         if direction not in {"BUY", "SELL"}:
             raise ValueError("Direction must be BUY or SELL")
         if entry_price <= 0:
@@ -200,6 +237,7 @@ class DemoTradingEngine:
             "status": "OPEN",
             "created_at": moment.isoformat(),
             "simulated": True,
+            "account_type": book,
         }
         entry_txn = {
             "transaction_id": str(uuid.uuid4()),
@@ -208,6 +246,7 @@ class DemoTradingEngine:
             "amount": -round(stake, 2),
             "referenceId": trade_id,
             "createdAt": moment.isoformat(),
+            "account_type": book,
         }
         opened = self.ledger.commit_open(
             user_id=user_id,
@@ -221,8 +260,13 @@ class DemoTradingEngine:
         self._hot_ready = True
         if getattr(self.ledger, "defer_writes", False):
             self._overlay[opened["trade_id"]] = dict(opened)
+        if book == BOOK_LIVE:
+            getter = getattr(self.accounts, "get_live_balance", None)
+            if getter is not None:
+                self._live_balance_cache[user_id] = getter(user_id)
+        elif user_id in self._balance_cache:
             self._balance_cache[user_id] = self.accounts.get_balance(user_id)
-        self._trim_history(user_id)
+        self._trim_history(user_id, book)
         return opened
 
     def settle(self, trade_id: str, expiry_price: float) -> dict:
@@ -230,7 +274,15 @@ class DemoTradingEngine:
             return self._settle_hot(trade_id, expiry_price)
         updated = self.ledger.commit_settle(trade_id, expiry_price, _compute_settlement)
         self._hot_open.pop(trade_id, None)
-        self._trim_history(updated["user_id"])
+        book = account_book(updated)
+        user_id = updated["user_id"]
+        if book == BOOK_LIVE:
+            getter = getattr(self.accounts, "get_live_balance", None)
+            if getter is not None:
+                self._live_balance_cache[user_id] = getter(user_id)
+        elif user_id in self._balance_cache:
+            self._balance_cache[user_id] = self.accounts.get_balance(user_id)
+        self._trim_history(user_id, book)
         return updated
 
     def _settle_hot(self, trade_id: str, expiry_price: float) -> dict:
@@ -245,8 +297,16 @@ class DemoTradingEngine:
             return dict(trade)
         updated, credit, _extra = _compute_settlement(trade, expiry_price)
         user_id = updated["user_id"]
+        book = account_book(updated)
         if credit:
-            self._balance_cache[user_id] = round(self._cached_balance(user_id) + credit, 2)
+            if book == BOOK_LIVE:
+                self._live_balance_cache[user_id] = round(
+                    self._cached_live_balance(user_id) + credit, 2
+                )
+            else:
+                self._balance_cache[user_id] = round(self._cached_balance(user_id) + credit, 2)
+        elif book == BOOK_LIVE:
+            self._cached_live_balance(user_id)
         elif user_id not in self._balance_cache:
             self._cached_balance(user_id)
         self._overlay[trade_id] = updated
@@ -263,16 +323,21 @@ class DemoTradingEngine:
             self._balance_cache[user_id] = self.accounts.get_balance(user_id)
         return self._balance_cache[user_id]
 
+    def _cached_live_balance(self, user_id: str) -> float:
+        if user_id not in self._live_balance_cache:
+            self._live_balance_cache[user_id] = self.live_balance(user_id)
+        return self._live_balance_cache[user_id]
+
     def _persist_settle(self, trade_id: str, expiry_price: float, user_id: str) -> None:
         with self._persist_lock:
             try:
-                self.ledger.commit_settle(trade_id, expiry_price, _compute_settlement)
-                self._trim_history(user_id)
+                updated = self.ledger.commit_settle(trade_id, expiry_price, _compute_settlement)
+                self._trim_history(user_id, account_book(updated))
             except Exception:
                 return
 
-    def statistics(self, user_id: str) -> dict:
-        rows = [t for t in self.listed_trades(user_id) if t.get("result")]
+    def statistics(self, user_id: str, account_type: str = BOOK_DEMO) -> dict:
+        rows = [t for t in self.listed_trades(user_id, account_type) if t.get("result")]
         wins = sum(1 for t in rows if t["result"] == "WIN")
         losses = sum(1 for t in rows if t["result"] == "LOSS")
         draws = sum(1 for t in rows if t["result"] == "DRAW")
@@ -299,7 +364,7 @@ class DemoTradingEngine:
             "draws": draws,
             "win_rate": round((wins / total) * 100, 2) if total else 0.0,
             "total_profit_loss": pnl,
-            "current_balance": self.balance(user_id),
+            "current_balance": self.book_balance(user_id, account_type),
             "best_streak": best,
             "current_streak": streak,
             "simulated": True,

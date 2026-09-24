@@ -94,28 +94,32 @@ class _TradeScreenState extends State<TradeScreen> {
   }
 
   Future<void> _place(String direction) async {
-    if (AppScope.settings(context).isLiveMode) {
+    final market = AppScope.market(context);
+    final trading = AppScope.trading(context);
+    final live = AppScope.settings(context).isLiveMode;
+    if (live && trading.liveBalance < trading.stake) {
       await _showLiveBlocked();
       return;
     }
-    final market = AppScope.market(context);
-    final trading = AppScope.trading(context);
     await trading.openTrade(
       asset: market.focusedAsset,
       direction: direction,
       entryPrice: market.quotes[market.focusedAsset]?.price,
+      live: live,
     );
   }
 
   Future<void> _showLiveBlocked() async {
     if (!mounted) return;
+    final trading = AppScope.trading(context);
     await showDialog<void>(
       context: context,
       builder: (context) {
         return AlertDialog(
           title: const Text('Insufficient Balance'),
-          content: const Text(
-            'Your live balance is \$0.00.\nLive trading is unavailable.',
+          content: Text(
+            'Your live balance is ${AppUtils.formatMoney(trading.liveBalance)}.\n'
+            'Live trading requires available Live Balance.',
           ),
           actions: [
             TextButton(
@@ -354,7 +358,7 @@ class _ModeBalanceControl extends StatelessWidget {
     final trading = AppScope.trading(context);
     final live = settings.isLiveMode;
     final label = live ? 'LIVE' : 'DEMO';
-    final balance = live ? 0.0 : trading.demoDisplayBalance;
+    final balance = live ? trading.liveBalance : trading.demoDisplayBalance;
 
     return Pressable(
       onPressed: () => _openSheet(context),
@@ -577,7 +581,9 @@ class _ManualTradePanelState extends State<_ManualTradePanel> {
   @override
   void initState() {
     super.initState();
-    _amount = TextEditingController(text: widget.trading.stake.toStringAsFixed(0));
+    _amount = TextEditingController(
+      text: AppUtils.formatStakeInput(widget.trading.stake),
+    );
   }
 
   @override
@@ -587,9 +593,16 @@ class _ManualTradePanelState extends State<_ManualTradePanel> {
   }
 
   void _commitAmount(String raw) {
-    final parsed = double.tryParse(raw.replaceAll(',', '').replaceAll('\$', ''));
+    final parsed = AppUtils.parseStakeInput(raw);
     if (parsed == null) return;
     widget.trading.setStake(parsed);
+    final formatted = AppUtils.formatStakeInput(parsed);
+    if (_amount.text != formatted) {
+      _amount.value = TextEditingValue(
+        text: formatted,
+        selection: TextSelection.collapsed(offset: formatted.length),
+      );
+    }
     if (parsed < AppConstants.minStake) {
       widget.trading.showMessage('Minimum trade amount is \$1.');
     } else if (parsed > AppConstants.maxStake) {

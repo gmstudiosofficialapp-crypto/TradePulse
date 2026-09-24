@@ -5,6 +5,7 @@ import '../../screens/auth/login_screen.dart';
 import '../../screens/auth/reset_password_screen.dart';
 import '../../screens/auth/signup_screen.dart';
 import '../../screens/history/history_screen.dart';
+import '../../screens/leaderboard/leaderboard_screen.dart';
 import '../../screens/home/home_screen.dart';
 import '../../screens/markets/markets_screen.dart';
 import '../../screens/profile/change_password_screen.dart';
@@ -76,6 +77,7 @@ class AppRouter {
       AppRoutes.markets => const MarketsScreen(),
       AppRoutes.trade => TradeScreen(initialAsset: tradeAsset),
       AppRoutes.history => const HistoryScreen(),
+      AppRoutes.leaderboard => const LeaderboardScreen(),
       AppRoutes.profile => const ProfileScreen(),
       AppRoutes.settings => const SettingsScreen(),
       AppRoutes.editProfile => const EditProfileScreen(),

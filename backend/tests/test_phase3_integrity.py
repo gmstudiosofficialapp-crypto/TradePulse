@@ -87,7 +87,8 @@ def test_demo_trade_api_uses_server_price() -> None:
                 "live": True,
             },
         )
-        assert live.status_code == 403
+        assert live.status_code == 400
+        assert "live balance" in str(live.json()["detail"]).lower()
         private = client.get("/api/private/reference", params={"asset": "BTC/USD-OTC"})
         assert private.status_code == 200
         public_signal = client.get("/api/signals/latest", params={"asset": "BTC/USD-OTC"})

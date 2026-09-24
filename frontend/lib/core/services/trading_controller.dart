@@ -13,6 +13,7 @@ class TradingController extends ChangeNotifier {
   final TradingService _service;
   String? userId;
   double balance = 10000;
+  double liveBalance = 0;
   double sessionDemoCredit = 0;
   double stake = 10;
   int expirySeconds = 60;
@@ -83,6 +84,9 @@ class TradingController extends ChangeNotifier {
     notifyListeners();
   }
 
+  Future<List<Map<String, dynamic>>> loadLeaderboard() =>
+      _service.getLeaderboard();
+
   Future<void> restoreDemoFunds() async {
     final needed = 10000 - demoDisplayBalance;
     if (needed > 0) await addDemoFunds(needed);
@@ -105,8 +109,11 @@ class TradingController extends ChangeNotifier {
     final epoch = _balanceEpoch;
     try {
       final nextBalance = await _service.getBalance(id);
+      liveBalance = await _service.getLiveBalance(id);
       statistics = await _service.getStatistics(id);
-      history = _mergeHistory(await _service.getTrades(id));
+      final demoRows = await _service.getTrades(id);
+      final liveRows = await _service.getLiveTrades(id);
+      history = _mergeHistory([...demoRows, ...liveRows]);
       if (epoch == _balanceEpoch) {
         balance = nextBalance;
       }
@@ -164,6 +171,7 @@ class TradingController extends ChangeNotifier {
     required String asset,
     required String direction,
     double? entryPrice,
+    bool live = false,
   }) async {
     final id = userId;
     if (id == null) {
@@ -186,8 +194,10 @@ class TradingController extends ChangeNotifier {
       notifyListeners();
       return;
     }
-    if (stake > demoDisplayBalance) {
-      error = 'Insufficient demo balance';
+    final usingLive = live;
+    final available = usingLive ? liveBalance : demoDisplayBalance;
+    if (stake > available) {
+      error = usingLive ? 'Insufficient live balance' : 'Insufficient demo balance';
       notifyListeners();
       return;
     }
@@ -210,7 +220,11 @@ class TradingController extends ChangeNotifier {
       payoutRate: OtcAssets.payoutRate(asset),
     );
     _upsert(optimistic);
-    balance = (balance - stake).clamp(0, double.infinity).toDouble();
+    if (usingLive) {
+      liveBalance = (liveBalance - stake).clamp(0, double.infinity).toDouble();
+    } else {
+      balance = (balance - stake).clamp(0, double.infinity).toDouble();
+    }
     notifyListeners();
     try {
       final opened = await _service.openTrade(
@@ -219,6 +233,7 @@ class TradingController extends ChangeNotifier {
         direction: direction,
         stake: stake,
         expirySeconds: expirySeconds,
+        live: usingLive,
       );
       _consumeOptimistic(opened, localId: localId);
       error = null;
@@ -226,7 +241,11 @@ class TradingController extends ChangeNotifier {
       unawaited(refresh(asset: asset));
     } catch (exc) {
       history = history.where((item) => item.tradeId != localId).toList();
-      balance += stake;
+      if (usingLive) {
+        liveBalance += stake;
+      } else {
+        balance += stake;
+      }
       error = exc.toString().replaceFirst('Exception: ', '');
     } finally {
       _openInFlight = (_openInFlight - 1).clamp(0, 10);
@@ -270,7 +289,13 @@ class TradingController extends ChangeNotifier {
     if (type == 'balance_updated' && event['balance'] is num) {
       if (!_ownsAccountEvent(event)) return;
       _balanceEpoch++;
-      balance = (event['balance'] as num).toDouble();
+      final book = event['account_type'] ??
+          (event['trade'] is Map ? (event['trade'] as Map)['account_type'] : null);
+      if (book == 'LIVE') {
+        liveBalance = (event['balance'] as num).toDouble();
+      } else {
+        balance = (event['balance'] as num).toDouble();
+      }
       notifyListeners();
     }
   }

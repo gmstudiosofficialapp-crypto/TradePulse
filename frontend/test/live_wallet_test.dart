@@ -268,6 +268,7 @@ void main() {
     expect(find.text('Manage Funds'), findsOneWidget);
     expect(find.text('Live Balance'), findsOneWidget);
     expect(find.text(r'$0.00'), findsWidgets);
+    expect(find.text('LEADERBOARD'), findsOneWidget);
     expect(find.text('Deposit'), findsOneWidget);
     expect(find.text('Withdraw'), findsOneWidget);
     expect(find.text('Install TradePulse'), findsNothing);

@@ -61,60 +61,63 @@ class HomeScreen extends StatelessWidget {
             const SizedBox(height: 12),
             LayoutBuilder(
               builder: (context, constraints) {
-                final gap = 12.0;
-                final width = (constraints.maxWidth - gap * 2) / 3;
-                final cardWidth = width < 96 ? constraints.maxWidth : width;
+                const gap = 12.0;
+                final cardWidth = (constraints.maxWidth - gap) / 2;
+                Widget action({
+                  required String title,
+                  required IconData icon,
+                  required VoidCallback onPressed,
+                  required Duration delay,
+                }) {
+                  return SizedBox(
+                    width: cardWidth,
+                    height: 118,
+                    child: Entrance(
+                      delay: delay,
+                      child: QuickActionCard(
+                        title: title,
+                        icon: icon,
+                        onPressed: onPressed,
+                      ),
+                    ),
+                  );
+                }
+
                 return Wrap(
                   spacing: gap,
                   runSpacing: gap,
                   children: [
-                    SizedBox(
-                      width: cardWidth,
-                      height: 118,
-                      child: Entrance(
-                        delay: const Duration(milliseconds: 80),
-                        child: QuickActionCard(
-                          title: 'TRADE',
-                          icon: Icons.candlestick_chart_outlined,
-                          onPressed: () {
-                            Navigator.of(context).pushReplacementNamed(
-                              AppRoutes.trade,
-                            );
-                          },
-                        ),
-                      ),
+                    action(
+                      title: 'TRADE',
+                      icon: Icons.candlestick_chart_outlined,
+                      delay: const Duration(milliseconds: 80),
+                      onPressed: () {
+                        Navigator.of(context).pushReplacementNamed(AppRoutes.trade);
+                      },
                     ),
-                    SizedBox(
-                      width: cardWidth,
-                      height: 118,
-                      child: Entrance(
-                        delay: const Duration(milliseconds: 120),
-                        child: QuickActionCard(
-                          title: 'MARKETS',
-                          icon: Icons.grid_view_rounded,
-                          onPressed: () {
-                            Navigator.of(context).pushReplacementNamed(
-                              AppRoutes.markets,
-                            );
-                          },
-                        ),
-                      ),
+                    action(
+                      title: 'MARKETS',
+                      icon: Icons.grid_view_rounded,
+                      delay: const Duration(milliseconds: 120),
+                      onPressed: () {
+                        Navigator.of(context).pushReplacementNamed(AppRoutes.markets);
+                      },
                     ),
-                    SizedBox(
-                      width: cardWidth,
-                      height: 118,
-                      child: Entrance(
-                        delay: const Duration(milliseconds: 160),
-                        child: QuickActionCard(
-                          title: 'HISTORY',
-                          icon: Icons.history,
-                          onPressed: () {
-                            Navigator.of(context).pushReplacementNamed(
-                              AppRoutes.history,
-                            );
-                          },
-                        ),
-                      ),
+                    action(
+                      title: 'HISTORY',
+                      icon: Icons.history,
+                      delay: const Duration(milliseconds: 160),
+                      onPressed: () {
+                        Navigator.of(context).pushReplacementNamed(AppRoutes.history);
+                      },
+                    ),
+                    action(
+                      title: 'LEADERBOARD',
+                      icon: Icons.emoji_events_outlined,
+                      delay: const Duration(milliseconds: 200),
+                      onPressed: () {
+                        Navigator.of(context).pushNamed(AppRoutes.leaderboard);
+                      },
                     ),
                   ],
                 );

@@ -281,5 +281,5 @@ def test_live_trading_rejection() -> None:
     engine = DemoTradingEngine()
     with pytest.raises(LiveTradingDisabledError):
         execute_live_trade()
-    with pytest.raises(LiveTradingDisabledError):
+    with pytest.raises(ValueError, match="Insufficient live balance"):
         engine.open_trade("alice", "BTC/USD-OTC", "BUY", 10, 100, live=True)

@@ -33,6 +33,40 @@ class TradingService {
     }
   }
 
+  Future<double> getLiveBalance(String userId) async {
+    final response = await http.get(
+      Uri.parse('$httpBase/api/live/balance'),
+      headers: await _headers(),
+    );
+    if (response.statusCode != 200) return 0;
+    final body = jsonDecode(response.body) as Map<String, dynamic>;
+    return (body['balance'] as num).toDouble();
+  }
+
+  Future<List<DemoTrade>> getLiveTrades(String userId) async {
+    final response = await http.get(
+      Uri.parse('$httpBase/api/live/trades'),
+      headers: await _headers(),
+    );
+    if (response.statusCode != 200) return [];
+    final body = jsonDecode(response.body) as Map<String, dynamic>;
+    final rows = body['trades'] as List<dynamic>? ?? [];
+    return rows
+        .map((row) => DemoTrade.fromJson(Map<String, dynamic>.from(row as Map)))
+        .toList();
+  }
+
+  Future<List<Map<String, dynamic>>> getLeaderboard({String? day}) async {
+    final uri = Uri.parse('$httpBase/api/leaderboard').replace(
+      queryParameters: {if (day != null) 'day': day},
+    );
+    final response = await http.get(uri);
+    if (response.statusCode != 200) return [];
+    final body = jsonDecode(response.body) as Map<String, dynamic>;
+    final rows = body['entries'] as List<dynamic>? ?? [];
+    return rows.map((row) => Map<String, dynamic>.from(row as Map)).toList();
+  }
+
   Future<double> getBalance(String userId) async {
     final response = await http.get(
       Uri.parse('$httpBase/api/demo/balance'),
@@ -92,6 +126,7 @@ class TradingService {
     required String direction,
     required double stake,
     int expirySeconds = 60,
+    bool live = false,
   }) async {
     final response = await http.post(
       Uri.parse('$httpBase/api/demo/trades'),
@@ -101,6 +136,7 @@ class TradingService {
         'direction': direction,
         'stake': stake,
         'expiry_seconds': expirySeconds,
+        'live': live,
       }),
     );
     if (response.statusCode != 200) {

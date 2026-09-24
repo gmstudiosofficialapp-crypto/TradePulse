@@ -54,6 +54,8 @@ class LiveBalanceCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colors = context.tpColors;
+    final trading = TradingScope.maybeOf(context);
+    final balance = trading?.liveBalance ?? 0;
     return PremiumCard(
       emphasized: true,
       child: Column(
@@ -77,16 +79,9 @@ class LiveBalanceCard extends StatelessWidget {
           ),
           const SizedBox(height: 12),
           Text(
-            AppUtils.formatMoney(0),
+            AppUtils.formatMoney(balance),
             style: Theme.of(context).textTheme.headlineSmall?.copyWith(
                   fontWeight: FontWeight.w700,
-                ),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            'Live trading is unavailable. No live balance.',
-            style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: colors.mutedText,
                 ),
           ),
         ],

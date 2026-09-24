@@ -26,6 +26,7 @@ class _SlowTrading extends _FakeTrading {
     required String direction,
     required double stake,
     int expirySeconds = 60,
+    bool live = false,
   }) async {
     await Future<void>.delayed(const Duration(milliseconds: 280));
     return super.openTrade(
@@ -34,6 +35,7 @@ class _SlowTrading extends _FakeTrading {
       direction: direction,
       stake: stake,
       expirySeconds: expirySeconds,
+      live: live,
     );
   }
 }
@@ -82,6 +84,7 @@ class _FakeTrading extends TradingService {
     required String direction,
     required double stake,
     int expirySeconds = 60,
+    bool live = false,
   }) async {
     lastAsset = asset;
     lastExpiry = expirySeconds;

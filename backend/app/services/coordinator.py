@@ -94,11 +94,13 @@ class Phase3Coordinator:
                 quote = self.market.quotes.get(trade["asset"])
                 price = quote.price if quote else trade["entry_price"]
             settled = self.trading.settle(trade["trade_id"], price)
+            book = settled.get("account_type") or "DEMO"
             await self._emit(
                 {
                     "type": "trade_result",
                     "user_id": settled["user_id"],
                     "asset": settled.get("asset"),
+                    "account_type": book,
                     "trade": settled,
                 }
             )
@@ -106,7 +108,8 @@ class Phase3Coordinator:
                 {
                     "type": "balance_updated",
                     "user_id": settled["user_id"],
-                    "balance": self.trading.balance(settled["user_id"]),
+                    "account_type": book,
+                    "balance": self.trading.book_balance(settled["user_id"], book),
                 }
             )
         for signal in list(self.signals.all_signals()):

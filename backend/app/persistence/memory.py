@@ -6,7 +6,9 @@ from threading import Lock
 class MemoryAccountStore:
     def __init__(self, initial: float) -> None:
         self.initial = initial
+        self.initial_live = 0.0
         self._balances: dict[str, float] = {}
+        self._live_balances: dict[str, float] = {}
         self._users: dict[str, dict] = {}
 
     def get_balance(self, user_id: str) -> float:
@@ -14,6 +16,12 @@ class MemoryAccountStore:
 
     def set_balance(self, user_id: str, amount: float) -> None:
         self._balances[user_id] = round(amount, 2)
+
+    def get_live_balance(self, user_id: str) -> float:
+        return self._live_balances.setdefault(user_id, self.initial_live)
+
+    def set_live_balance(self, user_id: str, amount: float) -> None:
+        self._live_balances[user_id] = round(amount, 2)
 
     def ensure_user(self, user_id: str, email: str = "", name: str = "") -> dict:
         existing = self._users.get(user_id)
@@ -35,6 +43,7 @@ class MemoryAccountStore:
         }
         self._users[user_id] = row
         self.get_balance(user_id)
+        self.get_live_balance(user_id)
         return row
 
     def get_user(self, user_id: str) -> dict | None:
@@ -119,19 +128,29 @@ class MemoryLedger:
         transaction: dict,
     ) -> dict:
         with self._lock:
-            available = self.accounts.get_balance(user_id)
-            if stake > available:
-                raise ValueError("Insufficient demo balance")
+            book = trade.get("account_type") or "DEMO"
+            if book == "LIVE":
+                available = self.accounts.get_live_balance(user_id)
+                if stake > available:
+                    raise ValueError("Insufficient live balance")
+            else:
+                available = self.accounts.get_balance(user_id)
+                if stake > available:
+                    raise ValueError("Insufficient demo balance")
             open_trades = [
                 item
                 for item in self.trades.list_for_user(user_id)
                 if item.get("result") is None
+                and (item.get("account_type") or "DEMO") == book
             ]
             if len(open_trades) >= max_open:
                 raise ValueError("Maximum 10 active trades reached.")
             before = available
             after = round(available - stake, 2)
-            self.accounts.set_balance(user_id, after)
+            if book == "LIVE":
+                self.accounts.set_live_balance(user_id, after)
+            else:
+                self.accounts.set_balance(user_id, after)
             transaction["balanceBefore"] = before
             transaction["balanceAfter"] = after
             self.trades.save(trade)
@@ -170,19 +189,32 @@ class MemoryLedger:
             if trade is None:
                 raise ValueError("Trade not found")
             updated, credit, txn = apply(trade, expiry_price)
+            book = updated.get("account_type") or "DEMO"
             if txn is not None:
                 user_id = updated["user_id"]
-                before = self.accounts.get_balance(user_id)
-                after = round(before + credit, 2)
-                self.accounts.set_balance(user_id, after)
+                if book == "LIVE":
+                    before = self.accounts.get_live_balance(user_id)
+                    after = round(before + credit, 2)
+                    self.accounts.set_live_balance(user_id, after)
+                else:
+                    before = self.accounts.get_balance(user_id)
+                    after = round(before + credit, 2)
+                    self.accounts.set_balance(user_id, after)
                 txn["balanceBefore"] = before
                 txn["balanceAfter"] = after
+                txn["account_type"] = book
                 self.transactions.save(txn)
             elif credit:
                 user_id = updated["user_id"]
-                self.accounts.set_balance(
-                    user_id,
-                    round(self.accounts.get_balance(user_id) + credit, 2),
-                )
+                if book == "LIVE":
+                    self.accounts.set_live_balance(
+                        user_id,
+                        round(self.accounts.get_live_balance(user_id) + credit, 2),
+                    )
+                else:
+                    self.accounts.set_balance(
+                        user_id,
+                        round(self.accounts.get_balance(user_id) + credit, 2),
+                    )
             self.trades.save(updated)
             return dict(updated)

@@ -28,6 +28,25 @@ class AppUtils {
     return price.toStringAsFixed(5);
   }
 
+  static String formatStakeInput(num value) {
+    final digits = value.round().abs().toString();
+    final grouped = StringBuffer();
+    for (var i = 0; i < digits.length; i++) {
+      if (i > 0 && (digits.length - i) % 3 == 0) {
+        grouped.write(',');
+      }
+      grouped.write(digits[i]);
+    }
+    final sign = value < 0 ? '-' : '';
+    return '$sign\$${grouped.toString()}';
+  }
+
+  static double? parseStakeInput(String raw) {
+    final cleaned = raw.replaceAll(RegExp(r'[^0-9.]'), '');
+    if (cleaned.isEmpty) return null;
+    return double.tryParse(cleaned);
+  }
+
   static String formatMoney(double value) {
     final parts = value.abs().toStringAsFixed(2).split('.');
     final digits = parts[0];

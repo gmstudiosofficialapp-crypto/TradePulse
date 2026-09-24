@@ -39,6 +39,23 @@ class FirestoreAccountStore:
             merge=True,
         )
 
+    def get_live_balance(self, user_id: str) -> float:
+        snap = self._account_ref(user_id).get()
+        if not snap.exists:
+            return 0.0
+        data = snap.to_dict() or {}
+        return float(data.get("live_balance", 0.0))
+
+    def set_live_balance(self, user_id: str, amount: float) -> None:
+        self._account_ref(user_id).set(
+            {
+                "uid": user_id,
+                "live_balance": round(amount, 2),
+                "updatedAt": _now(),
+            },
+            merge=True,
+        )
+
     def ensure_user(self, user_id: str, email: str = "", name: str = "") -> dict:
         user_ref = self._user_ref(user_id)
         account_ref = self._account_ref(user_id)
@@ -69,6 +86,7 @@ class FirestoreAccountStore:
                 {
                     "uid": user_id,
                     "balance": self.initial,
+                    "live_balance": 0.0,
                     "createdAt": now,
                     "updatedAt": now,
                 }
@@ -170,29 +188,44 @@ class FirestoreLedger:
 
         @firestore.transactional
         def _apply(txn) -> dict:
+            book = trade.get("account_type") or "DEMO"
             snap = account_ref.get(transaction=txn)
-            if snap.exists:
-                available = float((snap.to_dict() or {}).get("balance", self.accounts.initial))
+            data = snap.to_dict() or {} if snap.exists else {}
+            if book == "LIVE":
+                available = float(data.get("live_balance", 0.0)) if snap.exists else 0.0
+            elif snap.exists:
+                available = float(data.get("balance", self.accounts.initial))
             else:
                 available = self.accounts.initial
+            if not snap.exists:
                 txn.set(
                     account_ref,
                     {
                         "uid": user_id,
-                        "balance": available,
+                        "balance": self.accounts.initial if book != "LIVE" else available,
+                        "live_balance": available if book == "LIVE" else 0.0,
                         "createdAt": _now(),
                         "updatedAt": _now(),
                     },
                 )
+                if book != "LIVE":
+                    available = self.accounts.initial
             if stake > available:
-                raise ValueError("Insufficient demo balance")
-            open_docs = list(txn.get(open_query))
+                raise ValueError(
+                    "Insufficient live balance" if book == "LIVE" else "Insufficient demo balance"
+                )
+            open_docs = [
+                doc
+                for doc in list(txn.get(open_query))
+                if (doc.to_dict() or {}).get("account_type", "DEMO") == book
+            ]
             if len(open_docs) >= max_open:
                 raise ValueError("Maximum 10 active trades reached.")
             after = round(available - stake, 2)
+            field = "live_balance" if book == "LIVE" else "balance"
             txn.set(
                 account_ref,
-                {"uid": user_id, "balance": after, "updatedAt": _now()},
+                {"uid": user_id, field: after, "updatedAt": _now()},
                 merge=True,
             )
             transaction["balanceBefore"] = available
@@ -253,21 +286,29 @@ class FirestoreLedger:
             user_id = updated["user_id"]
             account_ref = self._db.collection("accounts").document(user_id)
             if extra is not None or credit:
+                book = updated.get("account_type") or "DEMO"
                 acc = account_ref.get(transaction=txn)
-                before = (
-                    float((acc.to_dict() or {}).get("balance", self.accounts.initial))
-                    if acc.exists
-                    else self.accounts.initial
-                )
+                acc_data = acc.to_dict() or {} if acc.exists else {}
+                if book == "LIVE":
+                    before = float(acc_data.get("live_balance", 0.0)) if acc.exists else 0.0
+                    field = "live_balance"
+                else:
+                    before = (
+                        float(acc_data.get("balance", self.accounts.initial))
+                        if acc.exists
+                        else self.accounts.initial
+                    )
+                    field = "balance"
                 after = round(before + credit, 2)
                 txn.set(
                     account_ref,
-                    {"uid": user_id, "balance": after, "updatedAt": _now()},
+                    {"uid": user_id, field: after, "updatedAt": _now()},
                     merge=True,
                 )
                 if extra is not None:
                     extra["balanceBefore"] = before
                     extra["balanceAfter"] = after
+                    extra["account_type"] = book
                     txn.set(
                         self._db.collection("transactions").document(extra["transaction_id"]),
                         dict(extra),

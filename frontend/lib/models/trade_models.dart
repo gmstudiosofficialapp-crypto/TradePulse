@@ -74,6 +74,7 @@ class DemoTrade {
     this.profitLoss = 0,
     this.payoutRate = 0.85,
     this.expirySeconds = 60,
+    this.accountType = 'DEMO',
   });
 
   final String tradeId;
@@ -89,6 +90,7 @@ class DemoTrade {
   final double profitLoss;
   final double payoutRate;
   final int expirySeconds;
+  final String accountType;
 
   bool get isOpen => result == null && status == 'OPEN';
 
@@ -117,6 +119,7 @@ class DemoTrade {
               .difference(DateTime.parse(json['entry_time'] as String).toUtc())
               .inSeconds
               .abs(),
+      accountType: json['account_type'] as String? ?? 'DEMO',
     );
   }
 }
