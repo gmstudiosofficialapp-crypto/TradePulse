@@ -17,7 +17,7 @@
   <base href="/">
 
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover, interactive-widget=resizes-content">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover, interactive-widget=overlays-content">
   <meta content="IE=Edge" http-equiv="X-UA-Compatible">
   <meta name="description" content="TradePulse OTC demo trading.">
   <meta name="theme-color" content="#0B1730">
@@ -42,7 +42,7 @@
       margin: 0;
       padding: 0;
       width: 100%;
-      height: var(--tp-visible-height, 100dvh);
+      height: 100%;
       overflow: hidden;
       overscroll-behavior: none;
       background-color: #0B1730;
@@ -56,40 +56,11 @@
 <body>
   <script>
     (function () {
-      var last = 0;
-      function visibleHeight() {
-        var viewport = window.visualViewport;
-        if (viewport && viewport.height) return Math.round(viewport.height);
-        return Math.round(window.innerHeight || document.documentElement.clientHeight || 0);
-      }
-      function apply() {
-        var height = visibleHeight();
-        if (height < 80) return;
-        if (height !== last) {
-          last = height;
-          document.documentElement.style.setProperty('--tp-visible-height', height + 'px');
-          ['flutter-view', 'flt-glass-pane'].forEach(function (selector) {
-            var el = document.querySelector(selector);
-            if (!el || !el.style) return;
-            el.style.height = height + 'px';
-            el.style.maxHeight = height + 'px';
-          });
+      try {
+        if (navigator.virtualKeyboard) {
+          navigator.virtualKeyboard.overlaysContent = true;
         }
-        if (window.scrollX || window.scrollY) {
-          window.scrollTo(0, 0);
-        }
-      }
-      apply();
-      window.addEventListener('resize', apply);
-      window.addEventListener('orientationchange', function () {
-        last = 0;
-        window.setTimeout(apply, 60);
-      });
-      window.addEventListener('scroll', apply, { passive: true });
-      if (window.visualViewport) {
-        window.visualViewport.addEventListener('resize', apply);
-        window.visualViewport.addEventListener('scroll', apply);
-      }
+      } catch (e) {}
     })();
     window.__tpInstallPrompt = null;
     window.__tpTakeInstallPrompt = function () {

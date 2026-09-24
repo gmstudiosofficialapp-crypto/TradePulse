@@ -102,7 +102,7 @@ class _LiveWithdrawScreenState extends State<LiveWithdrawScreen> {
     return AtmosphereBackground(
       child: Scaffold(
         backgroundColor: Colors.transparent,
-        resizeToAvoidBottomInset: false,
+        resizeToAvoidBottomInset: true,
         appBar: AppBar(
           title: const Text('Withdraw'),
           actions: [

@@ -32,7 +32,7 @@ class AppShell extends StatelessWidget {
           : AtmosphereStyle.app,
       child: Scaffold(
         backgroundColor: Colors.transparent,
-        resizeToAvoidBottomInset: false,
+        resizeToAvoidBottomInset: true,
         body: Row(
           children: [
             if (!compact)

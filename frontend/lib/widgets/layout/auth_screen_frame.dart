@@ -20,7 +20,7 @@ class AuthScreenFrame extends StatelessWidget {
       style: AtmosphereStyle.auth,
       child: Scaffold(
         backgroundColor: Colors.transparent,
-        resizeToAvoidBottomInset: false,
+        resizeToAvoidBottomInset: true,
         appBar: title == null ? null : AppBar(title: Text(title!)),
         body: SafeArea(
           child: Center(

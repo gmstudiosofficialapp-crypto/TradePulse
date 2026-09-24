@@ -54,7 +54,7 @@ class _LiveDepositScreenState extends State<LiveDepositScreen> {
     return AtmosphereBackground(
       child: Scaffold(
       backgroundColor: Colors.transparent,
-      resizeToAvoidBottomInset: false,
+      resizeToAvoidBottomInset: true,
       appBar: AppBar(
         title: const Text('Deposit'),
         actions: [
