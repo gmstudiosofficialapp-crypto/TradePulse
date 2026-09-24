@@ -17,7 +17,7 @@
   <base href="$FLUTTER_BASE_HREF">
 
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover, interactive-widget=resizes-visual">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover, interactive-widget=overlays-content">
   <meta content="IE=Edge" http-equiv="X-UA-Compatible">
   <meta name="description" content="TradePulse OTC demo trading.">
   <meta name="theme-color" content="#0B1730">
@@ -42,90 +42,28 @@
       margin: 0;
       padding: 0;
       width: 100%;
-      height: var(--tp-app-height, 100lvh);
-      min-height: var(--tp-app-height, 100lvh);
+      height: 100%;
       overflow: hidden;
+      overscroll-behavior: none;
       background-color: #0B1730;
     }
     flutter-view, flt-glass-pane {
-      width: 100% !important;
-      height: 100% !important;
-      min-height: 100% !important;
-      max-height: none !important;
+      width: 100%;
+      height: 100%;
     }
   </style>
 </head>
 <body>
   <script>
     (function () {
-      var baseline = Math.max(window.innerHeight || 0, document.documentElement.clientHeight || 0);
-      var landscape = window.innerWidth > window.innerHeight;
-      var timer = null;
-      function visualHeight() {
-        var viewport = window.visualViewport;
-        if (!viewport) return window.innerHeight || 0;
-        return viewport.height + viewport.offsetTop;
-      }
-      function overlap() {
-        return Math.max(0, baseline - visualHeight());
-      }
-      function keyboardOpen() {
-        return overlap() > 80;
-      }
-      function apply() {
-        document.documentElement.style.setProperty(
-          '--tp-app-height',
-          Math.round(baseline) + 'px'
-        );
-      }
-      function refreshBaseline() {
-        var nowLandscape = window.innerWidth > window.innerHeight;
-        if (nowLandscape !== landscape) {
-          landscape = nowLandscape;
-          baseline = Math.max(window.innerHeight || 0, document.documentElement.clientHeight || 0);
-        }
-        if (!keyboardOpen()) {
-          var measured = Math.max(
-            window.innerHeight || 0,
-            document.documentElement.clientHeight || 0,
-            visualHeight()
-          );
-          if (measured > baseline) baseline = measured;
-        }
-        apply();
-        return baseline;
-      }
-      window.__tpLayoutHeight = function () { return baseline; };
-      window.__tpKeyboardOverlap = function () { return overlap(); };
-      window.__tpSyncViewport = function () { return refreshBaseline(); };
-      window.__tpReleaseKeyboard = function () {
-        if (keyboardOpen()) return;
+      function pinScroll() {
         if (window.scrollX || window.scrollY) {
           window.scrollTo(0, 0);
         }
-        refreshBaseline();
-      };
-      apply();
-      function onViewportChange() {
-        if (timer) window.clearTimeout(timer);
-        timer = window.setTimeout(function () {
-          timer = null;
-          refreshBaseline();
-          if (!keyboardOpen() && (window.scrollX || window.scrollY)) {
-            window.scrollTo(0, 0);
-          }
-        }, 80);
       }
-      window.addEventListener('resize', onViewportChange);
-      window.addEventListener('orientationchange', function () {
-        landscape = window.innerWidth > window.innerHeight;
-        baseline = Math.max(window.innerHeight || 0, document.documentElement.clientHeight || 0);
-        apply();
-      });
-      window.addEventListener('pageshow', refreshBaseline);
+      window.addEventListener('scroll', pinScroll, { passive: true });
       if (window.visualViewport) {
-        window.visualViewport.addEventListener('resize', onViewportChange);
-        window.visualViewport.addEventListener('scroll', onViewportChange);
+        window.visualViewport.addEventListener('scroll', pinScroll, { passive: true });
       }
     })();
     window.__tpInstallPrompt = null;

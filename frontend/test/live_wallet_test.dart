@@ -141,7 +141,7 @@ void main() {
     expect(seen.viewInsets.bottom, 0);
   });
 
-  testWidgets('shrunk engine height restores after keyboard', (tester) async {
+  testWidgets('engine height is not rewritten after a size change', (tester) async {
     late MediaQueryData seen;
     Future<void> pumpSize(Size size) {
       return tester.pumpWidget(
@@ -162,7 +162,7 @@ void main() {
     await pumpSize(const Size(390, 844));
     expect(seen.size.height, 844);
     await pumpSize(const Size(390, 524));
-    expect(seen.size.height, 844);
+    expect(seen.size.height, 524);
     expect(seen.viewInsets.bottom, 0);
   });
 
