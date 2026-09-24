@@ -17,7 +17,7 @@ void main() {
     expect(frame.inset, 0);
   });
 
-  test('focused field keeps full height and applies keyboard inset', () {
+  test('focused field keeps full height without lifting the shell', () {
     final frame = ViewportFrame.resolve(
       mediaSize: const Size(390, 844),
       viewInsetBottom: 320,
@@ -28,10 +28,10 @@ void main() {
       lastWidth: 390,
     );
     expect(frame.height, 844);
-    expect(frame.inset, 320);
+    expect(frame.inset, 0);
   });
 
-  test('browser visualViewport overlap is used without shrinking height', () {
+  test('browser visualViewport overlap does not shrink height or add insets', () {
     final frame = ViewportFrame.resolve(
       mediaSize: const Size(390, 520),
       viewInsetBottom: 0,
@@ -42,7 +42,7 @@ void main() {
       lastWidth: 390,
     );
     expect(frame.height, 844);
-    expect(frame.inset, 324);
+    expect(frame.inset, 0);
   });
 
   test('shrunk engine height restores after keyboard close', () {

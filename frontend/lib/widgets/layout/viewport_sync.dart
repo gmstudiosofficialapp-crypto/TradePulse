@@ -35,10 +35,6 @@ class ViewportFrame {
       full = 0;
     }
     final browserOpen = overlap > keyboardThreshold;
-    final hasBrowser = browserHeight != null;
-    final flutterOpen =
-        !hasBrowser && viewInsetBottom > keyboardThreshold && focused;
-    final keyboardOpen = browserOpen || flutterOpen;
     if (!browserOpen) {
       full = math.max(full, mediaSize.height);
       if (browserHeight != null) {
@@ -49,10 +45,9 @@ class ViewportFrame {
       math.max(mediaSize.height, full),
       browserHeight ?? 0,
     );
-    final inset = keyboardOpen ? math.max(viewInsetBottom, overlap) : 0.0;
     return ViewportFrame(
       height: height,
-      inset: inset,
+      inset: 0,
       rememberedHeight: full,
     );
   }
@@ -73,15 +68,28 @@ class _ViewportSyncState extends State<ViewportSync> with WidgetsBindingObserver
   double _fullHeight = 0;
   double? _lastWidth;
   double _lastHeight = -1;
-  double _lastInset = -1;
+  FocusNode? _focused;
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
-    FocusManager.instance.addListener(_applySync);
+    FocusManager.instance.addListener(_onFocus);
     metrics.pinHost();
     _stop = metrics.listenViewport(_scheduleSync);
+  }
+
+  void _onFocus() {
+    final next = FocusManager.instance.primaryFocus;
+    final changed = next != _focused;
+    _focused = next;
+    if (changed && (next?.hasFocus ?? false)) {
+      _ensureFocusedVisible();
+    }
+    if (changed && !(next?.hasFocus ?? false)) {
+      metrics.releaseKeyboard();
+    }
+    _applySync();
   }
 
   void _scheduleSync() {
@@ -89,10 +97,25 @@ class _ViewportSyncState extends State<ViewportSync> with WidgetsBindingObserver
     _debounce = Timer(const Duration(milliseconds: 50), _applySync);
   }
 
+  void _ensureFocusedVisible() {
+    final ctx = FocusManager.instance.primaryFocus?.context;
+    if (ctx == null) return;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!ctx.mounted) return;
+      Scrollable.ensureVisible(
+        ctx,
+        alignment: 0.25,
+        alignmentPolicy: ScrollPositionAlignmentPolicy.explicit,
+        duration: const Duration(milliseconds: 160),
+        curve: Curves.easeOut,
+      );
+    });
+  }
+
   void _applySync() {
     if (!mounted) return;
-    final overlap = metrics.keyboardOverlap();
-    if (overlap <= ViewportFrame.keyboardThreshold) {
+    final focused = FocusManager.instance.primaryFocus?.hasFocus ?? false;
+    if (!focused) {
       metrics.pinHost();
       metrics.releaseKeyboard();
     }
@@ -101,18 +124,16 @@ class _ViewportSyncState extends State<ViewportSync> with WidgetsBindingObserver
       setState(() {});
       return;
     }
-    final focused = FocusManager.instance.primaryFocus?.hasFocus ?? false;
     final frame = ViewportFrame.resolve(
       mediaSize: media.size,
       viewInsetBottom: media.viewInsets.bottom,
-      overlap: overlap,
+      overlap: metrics.keyboardOverlap(),
       focused: focused,
       browserHeight: metrics.layoutHeight() ?? metrics.windowInnerHeight(),
       rememberedHeight: _fullHeight,
       lastWidth: _lastWidth,
     );
-    if ((frame.height - _lastHeight).abs() < 0.5 &&
-        (frame.inset - _lastInset).abs() < 0.5) {
+    if ((frame.height - _lastHeight).abs() < 0.5) {
       _fullHeight = frame.rememberedHeight;
       _lastWidth = media.size.width;
       return;
@@ -126,7 +147,7 @@ class _ViewportSyncState extends State<ViewportSync> with WidgetsBindingObserver
   @override
   void dispose() {
     _debounce?.cancel();
-    FocusManager.instance.removeListener(_applySync);
+    FocusManager.instance.removeListener(_onFocus);
     WidgetsBinding.instance.removeObserver(this);
     _stop?.call();
     super.dispose();
@@ -148,12 +169,11 @@ class _ViewportSyncState extends State<ViewportSync> with WidgetsBindingObserver
     _fullHeight = frame.rememberedHeight;
     _lastWidth = media.size.width;
     _lastHeight = frame.height;
-    _lastInset = frame.inset;
 
     return MediaQuery(
       data: media.copyWith(
         size: Size(media.size.width, frame.height),
-        viewInsets: EdgeInsets.only(bottom: frame.inset),
+        viewInsets: EdgeInsets.zero,
       ),
       child: widget.child,
     );

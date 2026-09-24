@@ -174,6 +174,7 @@ class _TradeScreenState extends State<TradeScreen> {
 
     return Scaffold(
       backgroundColor: Colors.transparent,
+      resizeToAvoidBottomInset: false,
       body: LayoutBuilder(
         builder: (context, constraints) {
           final watchWidth = math.min(280.0, constraints.maxWidth - 24);

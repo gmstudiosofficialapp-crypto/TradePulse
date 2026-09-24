@@ -116,7 +116,7 @@ void main() {
     expect(seen.size.height, 844);
   });
 
-  testWidgets('focused field keeps full height and keyboard insets', (tester) async {
+  testWidgets('focused field keeps full height without keyboard insets', (tester) async {
     late MediaQueryData seen;
     await tester.pumpWidget(
       MediaQuery(
@@ -138,7 +138,7 @@ void main() {
     );
     await tester.pump();
     expect(seen.size.height, 844);
-    expect(seen.viewInsets.bottom, greaterThan(80));
+    expect(seen.viewInsets.bottom, 0);
   });
 
   testWidgets('shrunk engine height restores after keyboard', (tester) async {

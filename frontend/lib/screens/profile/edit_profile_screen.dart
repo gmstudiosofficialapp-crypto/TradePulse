@@ -127,6 +127,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     return AtmosphereBackground(
       child: Scaffold(
         backgroundColor: Colors.transparent,
+        resizeToAvoidBottomInset: false,
         appBar: AppBar(title: const Text('Edit Profile')),
         body: ResponsiveBody(
           maxWidth: 720,

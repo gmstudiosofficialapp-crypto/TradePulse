@@ -55,6 +55,7 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
     return AtmosphereBackground(
       child: Scaffold(
       backgroundColor: Colors.transparent,
+      resizeToAvoidBottomInset: false,
       appBar: AppBar(title: const Text('Change Password')),
       body: ResponsiveBody(
         maxWidth: 480,
