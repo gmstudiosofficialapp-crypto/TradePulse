@@ -38,8 +38,8 @@ void main() {
       isTrue,
     );
     expect(html.contains('apple-touch-icon'), isTrue);
-    expect(html.contains('interactive-widget=overlays-content'), isTrue);
-    expect(html.contains('pinScroll'), isTrue);
+    expect(html.contains('interactive-widget=resizes-content'), isTrue);
+    expect(html.contains('--tp-visible-height'), isTrue);
     expect(html.contains('__tpTakeInstallPrompt'), isTrue);
     expect(html.contains('beforeinstallprompt'), isTrue);
     expect(html.contains('tradepulse_frontend'), isFalse);

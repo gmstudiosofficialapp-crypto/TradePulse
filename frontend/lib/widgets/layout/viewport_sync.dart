@@ -37,13 +37,19 @@ class ViewportSync extends StatefulWidget {
   State<ViewportSync> createState() => _ViewportSyncState();
 }
 
-class _ViewportSyncState extends State<ViewportSync> {
+class _ViewportSyncState extends State<ViewportSync> with WidgetsBindingObserver {
   FocusNode? _focused;
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     FocusManager.instance.addListener(_onFocus);
+  }
+
+  @override
+  void didChangeMetrics() {
+    if (mounted) setState(() {});
   }
 
   void _onFocus() {
@@ -62,7 +68,7 @@ class _ViewportSyncState extends State<ViewportSync> {
       if (!ctx.mounted) return;
       Scrollable.ensureVisible(
         ctx,
-        alignment: 0.25,
+        alignment: 0.2,
         alignmentPolicy: ScrollPositionAlignmentPolicy.explicit,
         duration: const Duration(milliseconds: 160),
         curve: Curves.easeOut,
@@ -73,6 +79,7 @@ class _ViewportSyncState extends State<ViewportSync> {
   @override
   void dispose() {
     FocusManager.instance.removeListener(_onFocus);
+    WidgetsBinding.instance.removeObserver(this);
     super.dispose();
   }
 
