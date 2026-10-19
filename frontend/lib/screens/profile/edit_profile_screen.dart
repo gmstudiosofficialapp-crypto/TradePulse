@@ -113,6 +113,9 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
         postalCode: _postal.text.trim(),
       );
       if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Profile saved')),
+      );
       Navigator.of(context).pop();
     } on AuthException catch (error) {
       setState(() => _error = error.message);

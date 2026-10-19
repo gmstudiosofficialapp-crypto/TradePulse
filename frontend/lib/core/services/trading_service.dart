@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 
 import '../../models/trade_models.dart';
+import '../../models/withdraw_models.dart';
 import '../constants/app_constants.dart';
 import 'signup_bonus_notice.dart';
 
@@ -60,32 +61,63 @@ class TradingService {
         .toList();
   }
 
-  Future<Map<String, dynamic>> previewWithdrawal({
+  Future<Map<String, dynamic>> createWithdrawal({
     required double amount,
     required String method,
-    required String address,
+    required String paymentDetails,
   }) async {
     final response = await http.post(
-      Uri.parse('$httpBase/api/live/withdraw/preview'),
+      Uri.parse('$httpBase/api/live/withdraw'),
       headers: await _headers(),
       body: jsonEncode({
         'amount': amount,
         'method': method,
-        'address': address,
+        'payment_details': paymentDetails,
+        'address': paymentDetails,
       }),
     );
     if (response.statusCode == 401) {
       throw Exception('Session expired. Sign in again.');
     }
     final body = jsonDecode(response.body);
-    if (response.statusCode == 400) {
-      final detail = body is Map ? body['detail'] : 'Unable to preview withdrawal';
+    if (response.statusCode == 400 || response.statusCode == 409) {
+      final detail = body is Map ? body['detail'] : 'Unable to submit withdrawal';
       throw WithdrawValidationException('$detail');
     }
     if (response.statusCode != 200 || body is! Map) {
-      throw Exception('Unable to preview withdrawal');
+      throw Exception('Unable to submit withdrawal');
     }
     return Map<String, dynamic>.from(body);
+  }
+
+  Future<List<WithdrawalRequest>> listWithdrawals() async {
+    final response = await http.get(
+      Uri.parse('$httpBase/api/live/withdrawals'),
+      headers: await _headers(),
+    );
+    if (response.statusCode != 200) return [];
+    final body = jsonDecode(response.body) as Map<String, dynamic>;
+    final rows = body['withdrawals'] as List<dynamic>? ?? [];
+    return rows
+        .map((row) => WithdrawalRequest.fromJson(Map<String, dynamic>.from(row as Map)))
+        .toList();
+  }
+
+  Future<WithdrawalRequest> getWithdrawal(String requestId) async {
+    final response = await http.get(
+      Uri.parse('$httpBase/api/live/withdrawals/$requestId'),
+      headers: await _headers(),
+    );
+    if (response.statusCode == 401) {
+      throw Exception('Session expired. Sign in again.');
+    }
+    final body = jsonDecode(response.body);
+    if (response.statusCode != 200 || body is! Map || body['request'] is! Map) {
+      throw Exception('Withdrawal request not found');
+    }
+    return WithdrawalRequest.fromJson(
+      Map<String, dynamic>.from(body['request'] as Map),
+    );
   }
 
   Future<List<Map<String, dynamic>>> getLeaderboard({String? day}) async {

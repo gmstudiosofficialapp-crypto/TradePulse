@@ -70,6 +70,7 @@ class ProfileScreen extends StatelessWidget {
                           runSpacing: 8,
                           children: [
                             Chip(
+                              key: const Key('profile-mode-badge'),
                               label: Text(
                                 AppScope.settings(context).isLiveMode
                                     ? 'LIVE'

@@ -33,7 +33,7 @@ class _TradeScreenState extends State<TradeScreen> {
   Timer? _flashTimer;
   String? _highlightId;
   String? _seenResultId;
-  String? _flashResult;
+  DemoTrade? _flashResult;
   var _watchlistOpen = false;
   var _activeOpen = false;
   TradingController? _trading;
@@ -56,6 +56,7 @@ class _TradeScreenState extends State<TradeScreen> {
     if (_trading != next) {
       _trading?.removeListener(_onTrading);
       _trading = next..addListener(_onTrading);
+      _onTrading();
     }
   }
 
@@ -86,9 +87,9 @@ class _TradeScreenState extends State<TradeScreen> {
     if (result == null || result.result == null) return;
     if (result.tradeId == _seenResultId) return;
     _seenResultId = result.tradeId;
-    setState(() => _flashResult = result.result);
+    setState(() => _flashResult = result);
     _flashTimer?.cancel();
-    _flashTimer = Timer(const Duration(milliseconds: 1000), () {
+    _flashTimer = Timer(const Duration(milliseconds: 2200), () {
       if (mounted) setState(() => _flashResult = null);
     });
   }
@@ -212,7 +213,7 @@ class _TradeScreenState extends State<TradeScreen> {
                   left: 0,
                   right: 0,
                   child: IgnorePointer(
-                    child: Center(child: _ResultFlash(result: _flashResult!)),
+                    child: Center(child: _ResultFlash(trade: _flashResult!)),
                   ),
                 ),
               if (_watchlistOpen)
@@ -898,30 +899,69 @@ class _WatchlistState extends State<_Watchlist> {
 }
 
 class _ResultFlash extends StatelessWidget {
-  const _ResultFlash({required this.result});
+  const _ResultFlash({required this.trade});
 
-  final String result;
+  final DemoTrade trade;
 
   @override
   Widget build(BuildContext context) {
+    final result = trade.result ?? '';
     final win = result == 'WIN';
+    final loss = result == 'LOSS';
     final colors = context.tpColors;
+    final tone = win
+        ? colors.success
+        : loss
+            ? colors.danger
+            : colors.mutedText;
+    final caption = win
+        ? 'Profit earned'
+        : loss
+            ? 'Amount lost'
+            : result == 'DRAW'
+                ? 'Stake refunded'
+                : '';
     return AnimatedOpacity(
       opacity: 1,
       duration: const Duration(milliseconds: 180),
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
         decoration: BoxDecoration(
-          color: (win ? colors.success : colors.danger).withValues(alpha: 0.92),
+          color: tone.withValues(alpha: 0.92),
           borderRadius: BorderRadius.circular(20),
         ),
-        child: Text(
-          win ? 'WIN' : 'LOSS',
-          style: const TextStyle(
-            color: Colors.white,
-            fontWeight: FontWeight.w800,
-            fontSize: 13,
-          ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              result.isEmpty ? trade.status : result,
+              style: const TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.w800,
+                fontSize: 16,
+              ),
+            ),
+            if (win || loss) ...[
+              const SizedBox(height: 2),
+              Text(
+                AppUtils.formatSignedMoney(trade.profitLoss),
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.w800,
+                  fontSize: 18,
+                ),
+              ),
+              if (caption.isNotEmpty)
+                Text(
+                  caption,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w600,
+                    fontSize: 11,
+                  ),
+                ),
+            ],
+          ],
         ),
       ),
     );

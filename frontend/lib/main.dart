@@ -7,6 +7,7 @@ import 'package:flutter/semantics.dart';
 import 'core/constants/app_constants.dart';
 import 'core/routes/app_router.dart';
 import 'core/routes/app_routes.dart';
+import 'core/services/admin_service.dart';
 import 'core/services/app_scope.dart';
 import 'core/services/auth_controller.dart';
 import 'core/services/auth_service.dart';
@@ -64,6 +65,7 @@ class _TradePulseAppState extends State<TradePulseApp> {
   late final TradingController _trading;
   late final LiveWalletController _wallet;
   late final PwaInstallController _pwa;
+  late final AdminSession _admin;
 
   @override
   void initState() {
@@ -78,6 +80,7 @@ class _TradePulseAppState extends State<TradePulseApp> {
       TradingService(tokenProvider: _authService.idToken),
     );
     _wallet = LiveWalletController();
+    _admin = AdminSession(AdminService());
     _pwa = widget.pwaInstall ?? PwaInstallController();
     _pwa.attach();
     _pwa.addListener(_rebuild);
@@ -154,9 +157,12 @@ class _TradePulseAppState extends State<TradePulseApp> {
                   trading: _trading,
                   child: LiveWalletScope(
                     wallet: _wallet,
-                    child: PwaInstallScope(
-                      install: _pwa,
-                      child: child ?? const SizedBox.shrink(),
+                    child: AdminScope(
+                      admin: _admin,
+                      child: PwaInstallScope(
+                        install: _pwa,
+                        child: child ?? const SizedBox.shrink(),
+                      ),
                     ),
                   ),
                 ),

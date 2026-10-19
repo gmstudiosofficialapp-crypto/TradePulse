@@ -6,7 +6,7 @@ import '../../core/services/trading_service.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/utils/app_utils.dart';
 import '../../core/utils/validators.dart';
-import '../../models/live_wallet_models.dart';
+import '../../models/withdraw_models.dart';
 import '../../widgets/brand/asset_icon.dart';
 import '../../widgets/buttons/pressable.dart';
 import '../../widgets/buttons/primary_button.dart';
@@ -26,16 +26,25 @@ class LiveWithdrawScreen extends StatefulWidget {
 class _LiveWithdrawScreenState extends State<LiveWithdrawScreen> {
   final _formKey = GlobalKey<FormState>();
   final _amount = TextEditingController();
-  final _address = TextEditingController();
-  LivePaymentAsset? _method;
+  final _details = TextEditingController();
+  WithdrawMethod? _method;
   String? _error;
-  String? _notice;
-  bool _loading = false;
+  var _loading = false;
+  var _titleTaps = 0;
+  DateTime? _firstTap;
+
+  @override
+  void initState() {
+    super.initState();
+    _amount.addListener(() {
+      if (mounted) setState(() {});
+    });
+  }
 
   @override
   void dispose() {
     _amount.dispose();
-    _address.dispose();
+    _details.dispose();
     super.dispose();
   }
 
@@ -43,13 +52,25 @@ class _LiveWithdrawScreenState extends State<LiveWithdrawScreen> {
     return TradingScope.maybeOf(context)?.liveBalance ?? 0;
   }
 
-  Future<void> _submit() async {
-    setState(() {
-      _error = null;
-      _notice = null;
-    });
+  double? get _usdAmount => Validators.parseMoney(_amount.text);
 
-    final amountError = Validators.withdrawAmount(_amount.text);
+  void _onTitleTap() {
+    final now = DateTime.now();
+    if (_firstTap == null || now.difference(_firstTap!) > const Duration(seconds: 2)) {
+      _firstTap = now;
+      _titleTaps = 1;
+      return;
+    }
+    _titleTaps += 1;
+    if (_titleTaps < 5) return;
+    _titleTaps = 0;
+    _firstTap = null;
+    Navigator.of(context).pushNamed(AppRoutes.adminLogin);
+  }
+
+  Future<void> _submit() async {
+    setState(() => _error = null);
+    final amountError = Validators.withdrawAmount(_amount.text, _method);
     if (amountError != null) {
       setState(() => _error = amountError);
       _formKey.currentState?.validate();
@@ -59,9 +80,9 @@ class _LiveWithdrawScreenState extends State<LiveWithdrawScreen> {
       setState(() => _error = Validators.withdrawMethodRequired);
       return;
     }
-    final addressError = Validators.withdrawAddress(_address.text, _method);
-    if (addressError != null) {
-      setState(() => _error = addressError);
+    final detailsError = Validators.withdrawPaymentDetails(_details.text, _method);
+    if (detailsError != null) {
+      setState(() => _error = detailsError);
       _formKey.currentState?.validate();
       return;
     }
@@ -74,24 +95,51 @@ class _LiveWithdrawScreenState extends State<LiveWithdrawScreen> {
     setState(() => _loading = true);
     try {
       final trading = TradingScope.maybeOf(context);
-      if (trading != null) {
-        await trading.previewWithdrawal(
-          amount: amount,
-          method: _method!.withdrawMethodId,
-          address: _address.text.trim(),
+      if (trading == null) {
+        throw WithdrawValidationException('Unable to submit withdrawal');
+      }
+      final result = await trading.createWithdrawal(
+        amount: amount,
+        method: _method!.id,
+        paymentDetails: _details.text.trim(),
+      );
+      if (!mounted) return;
+      final request = result['request'];
+      await _showSubmitted();
+      if (!mounted) return;
+      if (request is Map) {
+        Navigator.of(context).pushNamed(
+          AppRoutes.withdrawalDetails,
+          arguments: WithdrawalRequest.fromJson(Map<String, dynamic>.from(request)),
         );
       }
-      if (!mounted) return;
-      setState(() => _notice = Validators.withdrawDepositRequired);
     } on WithdrawValidationException catch (error) {
       if (!mounted) return;
       setState(() => _error = error.message);
     } catch (_) {
       if (!mounted) return;
-      setState(() => _notice = Validators.withdrawDepositRequired);
+      setState(() => _error = 'Unable to submit withdrawal');
     } finally {
       if (mounted) setState(() => _loading = false);
     }
+  }
+
+  Future<void> _showSubmitted() {
+    return showDialog<void>(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text(Validators.withdrawSubmittedTitle),
+          content: const Text(Validators.withdrawSubmittedBody),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('OK'),
+            ),
+          ],
+        );
+      },
+    );
   }
 
   @override
@@ -99,17 +147,30 @@ class _LiveWithdrawScreenState extends State<LiveWithdrawScreen> {
     final colors = context.tpColors;
     final live = _liveBalance;
     final insufficient = live < Validators.withdrawMin;
+    final method = _method;
+    final usd = _usdAmount;
+    final bdt = method?.category == WithdrawCategory.p2p && usd != null
+        ? Validators.usdToBdtAmount(usd)
+        : null;
     return AtmosphereBackground(
       child: Scaffold(
         backgroundColor: Colors.transparent,
         resizeToAvoidBottomInset: true,
         appBar: AppBar(
-          title: const Text('Withdraw'),
+          title: GestureDetector(
+            key: const Key('withdraw-title'),
+            onTap: _onTitleTap,
+            behavior: HitTestBehavior.opaque,
+            child: const Padding(
+              padding: EdgeInsets.symmetric(vertical: 8, horizontal: 4),
+              child: Text('Withdraw'),
+            ),
+          ),
           actions: [
             IconButton(
-              tooltip: 'Deposit & Withdraw History',
+              tooltip: 'Withdrawal History',
               onPressed: () =>
-                  Navigator.of(context).pushNamed(AppRoutes.liveTransfers),
+                  Navigator.of(context).pushNamed(AppRoutes.withdrawalHistory),
               icon: const Icon(Icons.receipt_long_outlined),
             ),
           ],
@@ -177,18 +238,18 @@ class _LiveWithdrawScreenState extends State<LiveWithdrawScreen> {
                             ),
                       ),
                       const SizedBox(height: 14),
-                      const _InfoRow(label: 'Minimum Withdrawal', value: r'$50.00'),
+                      const _InfoRow(label: 'Crypto minimum', value: r'$50.00'),
+                      const _InfoRow(label: 'Crypto maximum', value: r'$10,000.00'),
+                      const _InfoRow(label: 'P2P minimum', value: '৳5,000.00'),
+                      const _InfoRow(label: 'P2P maximum', value: '৳50,000.00'),
+                      const _InfoRow(label: 'P2P rate', value: r'$1 = ৳124'),
                       _InfoRow(
                         label: 'Available Balance',
                         value: AppUtils.formatMoney(live),
                       ),
                       const _InfoRow(
-                        label: 'Withdrawal Status',
-                        value: 'Processing',
-                      ),
-                      const _InfoRow(
-                        label: 'Processing',
-                        value: 'Deposit required',
+                        label: 'Processing time',
+                        value: '2–12 hours',
                       ),
                     ],
                   ),
@@ -205,8 +266,18 @@ class _LiveWithdrawScreenState extends State<LiveWithdrawScreen> {
                   label: 'Amount',
                   controller: _amount,
                   keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                  validator: Validators.withdrawAmount,
+                  validator: (value) => Validators.withdrawAmount(value, method),
                 ),
+                if (bdt != null) ...[
+                  const SizedBox(height: 8),
+                  Text(
+                    '${AppUtils.formatMoney(usd!)} = ${AppUtils.formatBdt(bdt)}',
+                    style: TextStyle(
+                      color: colors.accentSecondary,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ],
                 const SizedBox(height: 20),
                 Text(
                   'Payment Method',
@@ -215,47 +286,73 @@ class _LiveWithdrawScreenState extends State<LiveWithdrawScreen> {
                       ),
                 ),
                 const SizedBox(height: 10),
-                for (final asset in LivePaymentAsset.values) ...[
+                Text(
+                  'Crypto',
+                  style: TextStyle(
+                    color: colors.mutedText,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                for (final item in const [
+                  WithdrawMethod.btc,
+                  WithdrawMethod.usdtTrc20,
+                  WithdrawMethod.eth,
+                ]) ...[
                   _MethodTile(
-                    asset: asset,
-                    selected: _method == asset,
+                    method: item,
+                    selected: method == item,
                     onTap: () => setState(() {
-                      _method = asset;
+                      _method = item;
                       _error = null;
-                      _notice = null;
+                    }),
+                  ),
+                  const SizedBox(height: 8),
+                ],
+                const SizedBox(height: 6),
+                Text(
+                  'P2P',
+                  style: TextStyle(
+                    color: colors.mutedText,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                for (final item in const [
+                  WithdrawMethod.bkash,
+                  WithdrawMethod.nagad,
+                ]) ...[
+                  _MethodTile(
+                    method: item,
+                    selected: method == item,
+                    onTap: () => setState(() {
+                      _method = item;
+                      _error = null;
                     }),
                   ),
                   const SizedBox(height: 8),
                 ],
                 const SizedBox(height: 12),
                 Text(
-                  'Payment Address',
+                  method?.detailsLabel ?? 'Payment details',
                   style: Theme.of(context).textTheme.titleMedium?.copyWith(
                         fontWeight: FontWeight.w800,
                       ),
                 ),
                 const SizedBox(height: 8),
                 AppTextField(
-                  label: 'Payment address',
-                  controller: _address,
-                  hintText: _method?.withdrawAddressHint ??
-                      'Select a payment method first',
-                  validator: (value) => Validators.withdrawAddress(value, _method),
+                  label: method?.detailsLabel ?? 'Payment details',
+                  controller: _details,
+                  hintText: method?.detailsHint ?? 'Select a payment method first',
+                  keyboardType: method?.category == WithdrawCategory.p2p
+                      ? TextInputType.phone
+                      : TextInputType.text,
+                  validator: (value) =>
+                      Validators.withdrawPaymentDetails(value, method),
                 ),
                 const SizedBox(height: 16),
                 if (_error != null) ...[
                   ErrorState(message: _error!),
-                  const SizedBox(height: 12),
-                ],
-                if (_notice != null) ...[
-                  PremiumCard(
-                    child: Text(
-                      _notice!,
-                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                            height: 1.45,
-                          ),
-                    ),
-                  ),
                   const SizedBox(height: 12),
                 ],
                 PrimaryButton(
@@ -274,12 +371,12 @@ class _LiveWithdrawScreenState extends State<LiveWithdrawScreen> {
 
 class _MethodTile extends StatelessWidget {
   const _MethodTile({
-    required this.asset,
+    required this.method,
     required this.selected,
     required this.onTap,
   });
 
-  final LivePaymentAsset asset;
+  final WithdrawMethod method;
   final bool selected;
   final VoidCallback onTap;
 
@@ -301,19 +398,19 @@ class _MethodTile extends StatelessWidget {
         ),
         child: Row(
           children: [
-            AssetIcon(symbol: asset.iconSymbol, size: 36),
+            AssetIcon(symbol: method.iconSymbol, size: 36),
             const SizedBox(width: 12),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    asset.title,
+                    method.title,
                     style: const TextStyle(fontWeight: FontWeight.w800),
                   ),
-                  if (asset.network != null)
+                  if (method.network != null)
                     Text(
-                      asset.network!,
+                      method.network!,
                       style: TextStyle(fontSize: 12, color: colors.mutedText),
                     ),
                 ],

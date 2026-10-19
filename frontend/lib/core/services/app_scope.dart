@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import 'admin_service.dart';
 import 'auth_controller.dart';
 import 'live_wallet_controller.dart';
 import 'market_controller.dart';
@@ -89,6 +90,24 @@ class LiveWalletScope extends InheritedNotifier<LiveWalletController> {
   }
 }
 
+class AdminScope extends InheritedNotifier<AdminSession> {
+  const AdminScope({
+    super.key,
+    required AdminSession admin,
+    required super.child,
+  }) : super(notifier: admin);
+
+  static AdminSession of(BuildContext context) {
+    final scope = context.dependOnInheritedWidgetOfExactType<AdminScope>();
+    assert(scope != null, 'AdminScope not found');
+    return scope!.notifier!;
+  }
+
+  static AdminSession? maybeOf(BuildContext context) {
+    return context.dependOnInheritedWidgetOfExactType<AdminScope>()?.notifier;
+  }
+}
+
 class PwaInstallScope extends InheritedNotifier<PwaInstallController> {
   const PwaInstallScope({
     super.key,
@@ -121,4 +140,7 @@ class AppScope {
 
   static LiveWalletController wallet(BuildContext context) =>
       LiveWalletScope.of(context);
+
+  static AdminSession? admin(BuildContext context) =>
+      AdminScope.maybeOf(context);
 }

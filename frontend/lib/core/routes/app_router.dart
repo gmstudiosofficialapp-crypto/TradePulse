@@ -17,8 +17,13 @@ import '../../screens/trade/trade_screen.dart';
 import '../../screens/wallet/live_deposit_confirm_screen.dart';
 import '../../screens/wallet/live_deposit_screen.dart';
 import '../../screens/wallet/live_transfers_screen.dart';
+import '../../screens/admin/admin_login_screen.dart';
+import '../../screens/admin/admin_panel_screen.dart';
 import '../../screens/wallet/live_withdraw_screen.dart';
+import '../../screens/wallet/withdrawal_details_screen.dart';
+import '../../screens/wallet/withdrawal_history_screen.dart';
 import '../../models/live_wallet_models.dart';
+import '../../models/withdraw_models.dart';
 import '../../widgets/navigation/app_shell.dart';
 import '../services/auth_controller.dart';
 import 'app_routes.dart';
@@ -88,6 +93,13 @@ class AppRouter {
           : const LiveDepositScreen(),
       AppRoutes.liveWithdraw => const LiveWithdrawScreen(),
       AppRoutes.liveTransfers => const LiveTransfersScreen(),
+      AppRoutes.withdrawalHistory => const WithdrawalHistoryScreen(),
+      AppRoutes.withdrawalDetails => WithdrawalDetailsScreen(
+          requestId: _withdrawalRequestId(arguments),
+          initial: _withdrawalRequest(arguments),
+        ),
+      AppRoutes.adminLogin => const AdminLoginScreen(),
+      AppRoutes.adminPanel => const AdminPanelScreen(),
       _ => const LoginScreen(),
     };
 
@@ -95,5 +107,15 @@ class AppRouter {
       return AppShell(currentRoute: name, child: content);
     }
     return content;
+  }
+
+  static String _withdrawalRequestId(Object? arguments) {
+    if (arguments is String) return arguments;
+    if (arguments is WithdrawalRequest) return arguments.requestId;
+    return '';
+  }
+
+  static WithdrawalRequest? _withdrawalRequest(Object? arguments) {
+    return arguments is WithdrawalRequest ? arguments : null;
   }
 }

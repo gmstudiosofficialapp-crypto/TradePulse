@@ -469,19 +469,20 @@ void main() {
   });
 
   testWidgets('withdraw stays blocked at zero live balance', (tester) async {
+    await _tallSurface(tester);
     final auth = await _auth(tester);
     await tester.pumpWidget(_app(auth: auth, home: const LiveWithdrawScreen()));
     await tester.pump();
     expect(find.text(r'$0.00'), findsWidgets);
     expect(find.text('Insufficient Balance'), findsOneWidget);
     expect(find.text('Withdrawal Information'), findsOneWidget);
+    expect(find.text('Payment Method', skipOffstage: false), findsOneWidget);
     await tester.scrollUntilVisible(
       find.text('Submit Withdrawal'),
       240,
       scrollable: find.byType(Scrollable).first,
     );
     expect(find.text('Submit Withdrawal'), findsOneWidget);
-    expect(find.text('Payment Method'), findsOneWidget);
   });
 
   testWidgets('demo balance card is unchanged in value', (tester) async {

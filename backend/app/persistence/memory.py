@@ -3,7 +3,8 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from threading import Lock
 
-SIGNUP_LIVE_BONUS = 10.0
+SIGNUP_LIVE_BONUS = 0.0
+INITIAL_LIVE_BALANCE = 0.0
 
 
 class MemoryAccountStore:
@@ -47,7 +48,7 @@ class MemoryAccountStore:
                 else:
                     if email:
                         existing["email"] = email
-                    if name:
+                    if name and not str(existing.get("displayName") or "").strip():
                         existing["displayName"] = name
                     existing["updatedAt"] = now
                 granted = bool(self._bonus_granted.get(user_id))
@@ -66,12 +67,12 @@ class MemoryAccountStore:
             }
             self._users[user_id] = row
             self._balances[user_id] = round(self.initial, 2)
-            self._live_balances[user_id] = SIGNUP_LIVE_BONUS
-            self._bonus_granted[user_id] = True
+            self._live_balances[user_id] = INITIAL_LIVE_BALANCE
+            self._bonus_granted[user_id] = False
             return {
                 **row,
-                "signup_bonus_granted": True,
-                "signup_bonus_just_granted": True,
+                "signup_bonus_granted": False,
+                "signup_bonus_just_granted": False,
             }
 
     def get_user(self, user_id: str) -> dict | None:
@@ -118,6 +119,122 @@ class MemoryTransactionStore:
     def list_for_user(self, user_id: str) -> list[dict]:
         rows = [dict(item) for item in self._items.values() if item["user_id"] == user_id]
         return sorted(rows, key=lambda item: item["createdAt"], reverse=True)
+
+
+class MemoryWithdrawalStore:
+    def __init__(self, accounts: MemoryAccountStore | None = None) -> None:
+        self.accounts = accounts
+        self._items: dict[str, dict] = {}
+        self._lock = Lock()
+
+    def bind_accounts(self, accounts: MemoryAccountStore) -> None:
+        self.accounts = accounts
+
+    def get(self, request_id: str) -> dict | None:
+        row = self._items.get(request_id)
+        return dict(row) if row is not None else None
+
+    def list_for_user(self, user_id: str) -> list[dict]:
+        rows = [dict(item) for item in self._items.values() if item.get("user_id") == user_id]
+        return sorted(rows, key=lambda item: item.get("created_at", ""), reverse=True)
+
+    def list_all(self) -> list[dict]:
+        rows = [dict(item) for item in self._items.values()]
+        return sorted(rows, key=lambda item: item.get("created_at", ""), reverse=True)
+
+    def create_pending(self, row: dict) -> tuple[dict, float]:
+        from app.services.withdraw import (
+            MSG_INSUFFICIENT,
+            MSG_PENDING,
+            STATUS_PENDING,
+            WithdrawError,
+        )
+
+        if self.accounts is None:
+            raise RuntimeError("Withdrawal account store is unavailable")
+        with self._lock:
+            user_id = row["user_id"]
+            if any(
+                item.get("user_id") == user_id and item.get("status") == STATUS_PENDING
+                for item in self._items.values()
+            ):
+                raise WithdrawError(MSG_PENDING, "pending")
+            available = self.accounts.get_live_balance(user_id)
+            amount = float(row["amount_usd"])
+            if amount > available:
+                raise WithdrawError(MSG_INSUFFICIENT)
+            after = round(available - amount, 2)
+            if after < 0:
+                raise WithdrawError(MSG_INSUFFICIENT)
+            self.accounts.set_live_balance(user_id, after)
+            stored = dict(row)
+            stored["refunded"] = False
+            self._items[stored["request_id"]] = stored
+            return dict(stored), after
+
+    def approve(self, request_id: str, admin_username: str) -> dict:
+        from app.services.withdraw import (
+            MSG_ALREADY_REJECTED,
+            MSG_NOT_FOUND,
+            STATUS_PENDING,
+            STATUS_REJECTED,
+            STATUS_SUCCESSFUL,
+            WithdrawError,
+        )
+
+        with self._lock:
+            row = self._items.get(request_id)
+            if row is None:
+                raise WithdrawError(MSG_NOT_FOUND, "not_found")
+            if row["status"] == STATUS_SUCCESSFUL:
+                return dict(row)
+            if row["status"] == STATUS_REJECTED:
+                raise WithdrawError(MSG_ALREADY_REJECTED, "conflict")
+            if row["status"] != STATUS_PENDING:
+                raise WithdrawError(MSG_ALREADY_REJECTED, "conflict")
+            now = datetime.now(timezone.utc).isoformat()
+            row["status"] = STATUS_SUCCESSFUL
+            row["updated_at"] = now
+            row["processed_at"] = now
+            row["processed_by"] = admin_username
+            return dict(row)
+
+    def reject(self, request_id: str, admin_username: str, reason: str) -> tuple[dict, float]:
+        from app.services.withdraw import (
+            MSG_ALREADY_SUCCESSFUL,
+            MSG_NOT_FOUND,
+            STATUS_PENDING,
+            STATUS_REJECTED,
+            STATUS_SUCCESSFUL,
+            WithdrawError,
+        )
+
+        if self.accounts is None:
+            raise RuntimeError("Withdrawal account store is unavailable")
+        with self._lock:
+            row = self._items.get(request_id)
+            if row is None:
+                raise WithdrawError(MSG_NOT_FOUND, "not_found")
+            user_id = row["user_id"]
+            live = self.accounts.get_live_balance(user_id)
+            if row["status"] == STATUS_REJECTED:
+                return dict(row), live
+            if row["status"] == STATUS_SUCCESSFUL:
+                raise WithdrawError(MSG_ALREADY_SUCCESSFUL, "conflict")
+            if row["status"] != STATUS_PENDING:
+                raise WithdrawError(MSG_ALREADY_SUCCESSFUL, "conflict")
+            amount = float(row["amount_usd"])
+            if not row.get("refunded"):
+                live = round(live + amount, 2)
+                self.accounts.set_live_balance(user_id, live)
+                row["refunded"] = True
+            now = datetime.now(timezone.utc).isoformat()
+            row["status"] = STATUS_REJECTED
+            row["rejection_reason"] = reason
+            row["updated_at"] = now
+            row["processed_at"] = now
+            row["processed_by"] = admin_username
+            return dict(row), live
 
 
 class MemorySignalStore:

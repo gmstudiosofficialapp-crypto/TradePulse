@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import asyncio
 from collections.abc import Awaitable, Callable
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import datetime, timedelta, timezone
 from random import Random
 
@@ -18,6 +18,11 @@ from market_engine.services.btc_future_book import (
 from market_engine.services.candle_engine import CandleEngine, minute_floor_utc
 from market_engine.services.candle_store import CandleStore, MemoryCandleStore
 from market_engine.services.tick_engine import TickEngine
+from market_engine.services.reference_prices import (
+    collect_reference_prices,
+    is_valid_price,
+    reference_fetch_enabled,
+)
 
 TickHandler = Callable[[Tick, Candle, Candle | None], Awaitable[None] | None]
 
@@ -63,6 +68,7 @@ class MarketRuntime:
         self.open_candles: dict[str, Candle] = {}
         self.session_open: dict[str, float] = {}
         self.btc_future_book = BtcFutureBook()
+        self.reference_quotes: dict[str, dict] = {}
 
     def add_handler(self, handler: TickHandler) -> None:
         if handler not in self._handlers:
@@ -82,6 +88,8 @@ class MarketRuntime:
             "change_pct": round(change_pct, 4),
             "candle": candle.to_dict() if candle else None,
             "simulated": True,
+            "price_basis": "otc_simulated",
+            "reference": self.reference_quotes.get(symbol),
         }
 
     def all_quotes(self) -> list[dict]:
@@ -95,7 +103,28 @@ class MarketRuntime:
             payload.append(current.to_dict())
         return payload
 
+    def apply_reference_prices(self, quotes: dict[str, dict] | None = None) -> dict[str, dict]:
+        report = quotes if quotes is not None else collect_reference_prices()
+        self.reference_quotes = report
+        for symbol, stream in self.streams.items():
+            info = report.get(symbol) or {}
+            price = info.get("price")
+            if not is_valid_price(price):
+                continue
+            seeded = float(price)
+            cfg = replace(stream.config, base_price=seeded)
+            stream.config = cfg
+            stream.ticks.config = cfg
+            stream.ticks.generator.config = cfg
+            stream.ticks.generator.state.price = round(seeded, cfg.precision)
+        return report
+
     def warmup(self, now: datetime | None = None) -> None:
+        if reference_fetch_enabled() and not self.reference_quotes:
+            try:
+                self.apply_reference_prices()
+            except Exception:
+                self.reference_quotes = {}
         moment = now or datetime.now(timezone.utc)
         if moment.tzinfo is None:
             moment = moment.replace(tzinfo=timezone.utc)

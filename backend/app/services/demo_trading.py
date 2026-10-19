@@ -10,6 +10,7 @@ from app.persistence.memory import (
     MemoryLedger,
     MemoryTradeStore,
     MemoryTransactionStore,
+    MemoryWithdrawalStore,
 )
 
 
@@ -79,12 +80,17 @@ class DemoTradingEngine:
         trades: MemoryTradeStore | None = None,
         transactions: MemoryTransactionStore | None = None,
         ledger=None,
+        withdrawals=None,
     ) -> None:
         self.settings = settings or TradingSettings()
         self.accounts = accounts or MemoryAccountStore(self.settings.initial_balance)
         self.trades = trades or MemoryTradeStore()
         self.transactions = transactions or MemoryTransactionStore()
         self.ledger = ledger or MemoryLedger(self.accounts, self.trades, self.transactions)
+        self.withdrawals = withdrawals or MemoryWithdrawalStore(self.accounts)
+        bind = getattr(self.withdrawals, "bind_accounts", None)
+        if bind is not None:
+            bind(self.accounts)
         self._hot_open: dict[str, dict] = {}
         self._hot_ready = False
         self._overlay: dict[str, dict] = {}
@@ -115,6 +121,9 @@ class DemoTradingEngine:
         setter(user_id, after)
         self._live_balance_cache[user_id] = after
         return after
+
+    def note_live_balance(self, user_id: str, amount: float) -> None:
+        self._live_balance_cache[user_id] = round(float(amount), 2)
 
     def book_balance(self, user_id: str, book: str) -> float:
         if book == BOOK_LIVE:

@@ -11,7 +11,8 @@ def _now() -> str:
     return datetime.now(timezone.utc).isoformat()
 
 
-SIGNUP_LIVE_BONUS = 10.0
+SIGNUP_LIVE_BONUS = 0.0
+INITIAL_LIVE_BALANCE = 0.0
 
 
 class FirestoreAccountStore:
@@ -69,7 +70,7 @@ class FirestoreAccountStore:
             updates: dict[str, Any] = {"updatedAt": now}
             if email:
                 updates["email"] = email
-            if name:
+            if name and not str(row.get("displayName") or "").strip():
                 updates["displayName"] = name
             user_ref.set(updates, merge=True)
             row.update(updates)
@@ -96,15 +97,15 @@ class FirestoreAccountStore:
             payload = {
                 "uid": user_id,
                 "balance": self.initial,
-                "live_balance": SIGNUP_LIVE_BONUS,
-                "signup_bonus_granted": True,
+                "live_balance": INITIAL_LIVE_BALANCE,
+                "signup_bonus_granted": False,
                 "createdAt": now,
                 "updatedAt": now,
             }
             txn.set(account_ref, payload)
             return {
-                "signup_bonus_granted": True,
-                "signup_bonus_just_granted": True,
+                "signup_bonus_granted": False,
+                "signup_bonus_just_granted": False,
             }
 
         bonus = _ensure_account(self._db.transaction())
@@ -336,10 +337,164 @@ class FirestoreLedger:
         return _apply(self._db.transaction())
 
 
+class FirestoreWithdrawalStore:
+    def __init__(self, db, accounts: FirestoreAccountStore) -> None:
+        self._db = db
+        self.accounts = accounts
+
+    def _ref(self, request_id: str):
+        return self._db.collection("withdrawals").document(request_id)
+
+    def get(self, request_id: str) -> dict | None:
+        snap = self._ref(request_id).get()
+        if not snap.exists:
+            return None
+        return snap.to_dict()
+
+    def list_for_user(self, user_id: str) -> list[dict]:
+        rows = [
+            doc.to_dict() or {}
+            for doc in self._db.collection("withdrawals").where("user_id", "==", user_id).stream()
+        ]
+        return sorted(rows, key=lambda item: item.get("created_at", ""), reverse=True)
+
+    def list_all(self) -> list[dict]:
+        rows = [doc.to_dict() or {} for doc in self._db.collection("withdrawals").stream()]
+        return sorted(rows, key=lambda item: item.get("created_at", ""), reverse=True)
+
+    def create_pending(self, row: dict) -> tuple[dict, float]:
+        from app.services.withdraw import MSG_INSUFFICIENT, MSG_PENDING, WithdrawError
+
+        account_ref = self._db.collection("accounts").document(row["user_id"])
+        withdraw_ref = self._ref(row["request_id"])
+
+        @firestore.transactional
+        def _apply(txn) -> tuple[dict, float]:
+            snap = account_ref.get(transaction=txn)
+            data = snap.to_dict() or {} if snap.exists else {}
+            pending_id = data.get("pending_withdrawal_id")
+            if pending_id:
+                raise WithdrawError(MSG_PENDING, "pending")
+            available = float(data.get("live_balance", 0.0)) if snap.exists else 0.0
+            amount = float(row["amount_usd"])
+            if amount > available:
+                raise WithdrawError(MSG_INSUFFICIENT)
+            after = round(available - amount, 2)
+            stored = dict(row)
+            stored["refunded"] = False
+            txn.set(
+                account_ref,
+                {
+                    "uid": row["user_id"],
+                    "live_balance": after,
+                    "pending_withdrawal_id": row["request_id"],
+                    "updatedAt": _now(),
+                },
+                merge=True,
+            )
+            txn.set(withdraw_ref, stored)
+            return stored, after
+
+        return _apply(self._db.transaction())
+
+    def approve(self, request_id: str, admin_username: str) -> dict:
+        from app.services.withdraw import (
+            MSG_ALREADY_REJECTED,
+            MSG_NOT_FOUND,
+            STATUS_PENDING,
+            STATUS_REJECTED,
+            STATUS_SUCCESSFUL,
+            WithdrawError,
+        )
+
+        withdraw_ref = self._ref(request_id)
+
+        @firestore.transactional
+        def _apply(txn) -> dict:
+            snap = withdraw_ref.get(transaction=txn)
+            if not snap.exists:
+                raise WithdrawError(MSG_NOT_FOUND, "not_found")
+            row = snap.to_dict() or {}
+            if row.get("status") == STATUS_SUCCESSFUL:
+                return row
+            if row.get("status") == STATUS_REJECTED:
+                raise WithdrawError(MSG_ALREADY_REJECTED, "conflict")
+            if row.get("status") != STATUS_PENDING:
+                raise WithdrawError(MSG_ALREADY_REJECTED, "conflict")
+            now = _now()
+            row["status"] = STATUS_SUCCESSFUL
+            row["updated_at"] = now
+            row["processed_at"] = now
+            row["processed_by"] = admin_username
+            account_ref = self._db.collection("accounts").document(row["user_id"])
+            txn.set(withdraw_ref, row)
+            txn.set(
+                account_ref,
+                {"pending_withdrawal_id": None, "updatedAt": now},
+                merge=True,
+            )
+            return row
+
+        return _apply(self._db.transaction())
+
+    def reject(self, request_id: str, admin_username: str, reason: str) -> tuple[dict, float]:
+        from app.services.withdraw import (
+            MSG_ALREADY_SUCCESSFUL,
+            MSG_NOT_FOUND,
+            STATUS_PENDING,
+            STATUS_REJECTED,
+            STATUS_SUCCESSFUL,
+            WithdrawError,
+        )
+
+        withdraw_ref = self._ref(request_id)
+
+        @firestore.transactional
+        def _apply(txn) -> tuple[dict, float]:
+            snap = withdraw_ref.get(transaction=txn)
+            if not snap.exists:
+                raise WithdrawError(MSG_NOT_FOUND, "not_found")
+            row = snap.to_dict() or {}
+            account_ref = self._db.collection("accounts").document(row["user_id"])
+            acc = account_ref.get(transaction=txn)
+            acc_data = acc.to_dict() or {} if acc.exists else {}
+            live = float(acc_data.get("live_balance", 0.0)) if acc.exists else 0.0
+            if row.get("status") == STATUS_REJECTED:
+                return row, live
+            if row.get("status") == STATUS_SUCCESSFUL:
+                raise WithdrawError(MSG_ALREADY_SUCCESSFUL, "conflict")
+            if row.get("status") != STATUS_PENDING:
+                raise WithdrawError(MSG_ALREADY_SUCCESSFUL, "conflict")
+            amount = float(row.get("amount_usd") or 0)
+            if not row.get("refunded"):
+                live = round(live + amount, 2)
+                row["refunded"] = True
+            now = _now()
+            row["status"] = STATUS_REJECTED
+            row["rejection_reason"] = reason
+            row["updated_at"] = now
+            row["processed_at"] = now
+            row["processed_by"] = admin_username
+            txn.set(withdraw_ref, row)
+            txn.set(
+                account_ref,
+                {
+                    "live_balance": live,
+                    "pending_withdrawal_id": None,
+                    "updatedAt": now,
+                },
+                merge=True,
+            )
+            return row, live
+
+        return _apply(self._db.transaction())
+
+
 def build_firestore_stores(initial_balance: float, db=None):
     client = db or firestore_client()
     accounts = FirestoreAccountStore(client, initial_balance)
     trades = FirestoreTradeStore(client)
     transactions = FirestoreTransactionStore(client)
     ledger = FirestoreLedger(client, accounts, trades, transactions)
-    return accounts, trades, transactions, ledger
+    withdrawals = FirestoreWithdrawalStore(client, accounts)
+    return accounts, trades, transactions, ledger, withdrawals

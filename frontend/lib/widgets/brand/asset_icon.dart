@@ -165,6 +165,14 @@ class AssetIconCatalog {
           letters: 'USDT',
           primaryAsset: '$crypto/usdt.png',
         ),
+      'BKASH' => const AssetIconSpec(
+          color: Color(0xFFE2136E),
+          letters: 'bK',
+        ),
+      'NAGAD' => const AssetIconSpec(
+          color: Color(0xFFF58220),
+          letters: 'NG',
+        ),
       'USDC' => const AssetIconSpec(
           color: Color(0xFF2775CA),
           letters: 'USDC',

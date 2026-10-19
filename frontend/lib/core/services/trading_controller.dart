@@ -5,6 +5,7 @@ import 'package:flutter/foundation.dart';
 import '../../core/constants/app_constants.dart';
 import '../../core/constants/otc_assets.dart';
 import '../../models/trade_models.dart';
+import '../../models/withdraw_models.dart';
 import 'trading_service.dart';
 
 class TradingController extends ChangeNotifier {
@@ -87,17 +88,29 @@ class TradingController extends ChangeNotifier {
   Future<List<Map<String, dynamic>>> loadLeaderboard() =>
       _service.getLeaderboard();
 
-  Future<Map<String, dynamic>> previewWithdrawal({
+  Future<Map<String, dynamic>> createWithdrawal({
     required double amount,
     required String method,
-    required String address,
-  }) {
-    return _service.previewWithdrawal(
+    required String paymentDetails,
+  }) async {
+    final result = await _service.createWithdrawal(
       amount: amount,
       method: method,
-      address: address,
+      paymentDetails: paymentDetails,
     );
+    final next = result['live_balance'];
+    if (next is num) {
+      liveBalance = next.toDouble();
+      notifyListeners();
+    }
+    return result;
   }
+
+  Future<List<WithdrawalRequest>> listWithdrawals() =>
+      _service.listWithdrawals();
+
+  Future<WithdrawalRequest> getWithdrawal(String requestId) =>
+      _service.getWithdrawal(requestId);
 
   Future<void> restoreDemoFunds() async {
     final needed = 10000 - demoDisplayBalance;

@@ -14,7 +14,12 @@ from app.core.runtime import (
 )
 from app.services.demo_trading import BOOK_LIVE
 from app.services.leaderboard import build_daily_leaderboard
-from app.services.withdraw import preview_withdrawal
+from app.services.withdraw import (
+    WithdrawError,
+    create_withdrawal,
+    get_user_withdrawal,
+    list_user_withdrawals,
+)
 
 router = APIRouter(prefix="/api", tags=["demo"])
 
@@ -31,11 +36,21 @@ class DemoCreditBody(BaseModel):
     amount: float = Field(gt=0, le=1_000_000)
 
 
-class WithdrawPreviewBody(BaseModel):
+class WithdrawRequestBody(BaseModel):
     amount: Any = None
     method: Any = None
     address: Any = None
+    payment_details: Any = None
     user_id: Any = None
+
+
+def _withdraw_http(error: WithdrawError) -> None:
+    status = 400
+    if error.code == "not_found":
+        status = 404
+    elif error.code in ("pending", "conflict"):
+        status = 409
+    raise HTTPException(status_code=status, detail=error.message)
 
 
 class ProfileBody(BaseModel):
@@ -179,19 +194,35 @@ def live_transactions(user: AuthUser) -> dict:
     return {"transactions": rows, "account_type": BOOK_LIVE}
 
 
-@router.post("/live/withdraw/preview")
-def preview_live_withdraw(body: WithdrawPreviewBody, user: AuthUser) -> dict:
+@router.post("/live/withdraw")
+def create_live_withdraw(body: WithdrawRequestBody, user: AuthUser) -> dict:
     _bootstrap(user)
-    result = preview_withdrawal(
-        user_id=user.uid,
-        live_balance=get_trading().live_balance(user.uid),
-        amount=body.amount,
-        method=body.method,
-        address=body.address,
-    )
-    if not result["form_valid"]:
-        raise HTTPException(status_code=400, detail=result["message"])
-    return result
+    try:
+        return create_withdrawal(
+            user_id=user.uid,
+            amount=body.amount,
+            method=body.method,
+            payment_details=body.payment_details if body.payment_details is not None else body.address,
+        )
+    except WithdrawError as exc:
+        _withdraw_http(exc)
+        raise
+
+
+@router.get("/live/withdrawals")
+def list_live_withdrawals(user: AuthUser) -> dict:
+    _bootstrap(user)
+    return {"withdrawals": list_user_withdrawals(user.uid)}
+
+
+@router.get("/live/withdrawals/{request_id}")
+def get_live_withdrawal(request_id: str, user: AuthUser) -> dict:
+    _bootstrap(user)
+    try:
+        return {"request": get_user_withdrawal(user.uid, request_id)}
+    except WithdrawError as exc:
+        _withdraw_http(exc)
+        raise
 
 
 @router.get("/leaderboard")

@@ -183,6 +183,7 @@ class FirebaseAuthService implements AuthService {
       fullAddress: fullAddress,
       postalCode: postalCode,
     );
+    _applyRemoteUser(response.body);
     return _profile!;
   }
 
@@ -227,10 +228,24 @@ class FirebaseAuthService implements AuthService {
       );
       if (response.statusCode == 200) {
         applySignupBonusPayload(response.body);
+        _applyRemoteUser(response.body);
       }
     } catch (_) {
       // Account bootstrap is retried on the next authenticated API call.
     }
+  }
+
+  void _applyRemoteUser(String body) {
+    try {
+      final decoded = jsonDecode(body);
+      if (decoded is! Map) return;
+      final user = decoded['user'];
+      if (user is! Map) return;
+      _profile = UserProfile.fromServer(
+        Map<String, dynamic>.from(user),
+        current: _profile,
+      );
+    } catch (_) {}
   }
 
   UserProfile _fromUser(User user) {

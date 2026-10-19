@@ -3,6 +3,10 @@ import os
 os.environ.setdefault("TRADEPULSE_HISTORY", "24")
 os.environ.setdefault("TRADEPULSE_WARMUP_TICKS", "3")
 os.environ.setdefault("TRADEPULSE_PERSISTENCE", "memory")
+os.environ.setdefault("ADMIN_USERNAME", "test-admin")
+os.environ.setdefault("ADMIN_PASSWORD", "test-admin-pass")
+os.environ.setdefault("ADMIN_SESSION_SECRET", "test-admin-session")
+os.environ.setdefault("TRADEPULSE_REFERENCE_PRICES", "0")
 
 from app.core.firebase_auth import FirebaseUser, set_token_verifier
 

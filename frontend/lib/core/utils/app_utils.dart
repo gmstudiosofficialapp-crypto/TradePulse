@@ -79,6 +79,28 @@ class AppUtils {
     return '${seconds ~/ 60}m';
   }
 
+  static String formatBdt(double value) {
+    final usd = formatMoney(value);
+    return '৳${usd.substring(1)}';
+  }
+
+  static String formatDetailDate(DateTime value) {
+    final local = value.toLocal();
+    return '${months[local.month - 1]} ${local.day}, ${local.year}';
+  }
+
+  static String formatDetailTime(DateTime value) {
+    final local = value.toLocal();
+    final hour = local.hour % 12 == 0 ? 12 : local.hour % 12;
+    final minute = local.minute.toString().padLeft(2, '0');
+    final period = local.hour >= 12 ? 'PM' : 'AM';
+    return '$hour:$minute $period';
+  }
+
+  static String formatDetailStamp(DateTime value) {
+    return '${formatDetailDate(value)} • ${formatDetailTime(value)}';
+  }
+
   static String formatTxnWhen(DateTime value) {
     final local = value.toLocal();
     final hour = local.hour % 12 == 0 ? 12 : local.hour % 12;

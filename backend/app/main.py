@@ -16,6 +16,7 @@ ROOT = Path(__file__).resolve().parents[2]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
+from app.api.admin import router as admin_router
 from app.api.market import router as market_router
 from app.api.private import router as private_router
 from app.api.signal import router as signal_router
@@ -50,13 +51,16 @@ def _trading_engine(admin: AdminMarketControl) -> DemoTradingEngine:
     from app.persistence.firestore_store import build_firestore_stores
 
     init_firebase_admin()
-    accounts, trades, transactions, ledger = build_firestore_stores(admin.trading.initial_balance)
+    accounts, trades, transactions, ledger, withdrawals = build_firestore_stores(
+        admin.trading.initial_balance
+    )
     return DemoTradingEngine(
         settings=admin.trading,
         accounts=accounts,
         trades=trades,
         transactions=transactions,
         ledger=ledger,
+        withdrawals=withdrawals,
     )
 
 
@@ -100,6 +104,7 @@ def create_app(
     )
     application.include_router(market_router)
     application.include_router(trading_router)
+    application.include_router(admin_router)
     application.include_router(private_router)
     application.include_router(signal_router)
     application.include_router(ws_router)

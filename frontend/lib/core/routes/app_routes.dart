@@ -17,6 +17,10 @@ class AppRoutes {
   static const String liveDepositConfirm = '/live-deposit-confirm';
   static const String liveWithdraw = '/live-withdraw';
   static const String liveTransfers = '/live-transfers';
+  static const String withdrawalHistory = '/withdrawal-history';
+  static const String withdrawalDetails = '/withdrawal-details';
+  static const String adminLogin = '/admin-login';
+  static const String adminPanel = '/admin-panel';
 
   static const public = {
     splash,

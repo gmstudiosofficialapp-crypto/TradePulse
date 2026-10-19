@@ -232,8 +232,32 @@ void main() {
     );
     await tester.pumpWidget(_harness(child: const TradeScreen(), trading: trading));
     await tester.pump();
-    expect(find.textContaining('P/L'), findsNothing);
+    expect(find.text('WIN'), findsWidgets);
+    expect(find.text(r'+$8.50'), findsOneWidget);
+    expect(find.text('Profit earned'), findsOneWidget);
     expect(find.textContaining('BTC/USD-OTC   P/L'), findsNothing);
+  });
+
+  testWidgets('loss result uses settled profit_loss', (tester) async {
+    final trading = TradingController(_FakeTrading());
+    trading.lastResult = DemoTrade(
+      tradeId: 't-loss',
+      asset: 'BTC/USD-OTC',
+      direction: 'BUY',
+      stake: 600,
+      entryPrice: 67000,
+      entryTime: DateTime.now().toUtc(),
+      expiryTime: DateTime.now().toUtc(),
+      status: 'CLOSED',
+      expiryPrice: 66900,
+      result: 'LOSS',
+      profitLoss: -600,
+    );
+    await tester.pumpWidget(_harness(child: const TradeScreen(), trading: trading));
+    await tester.pump();
+    expect(find.text('LOSS'), findsWidgets);
+    expect(find.text(r'-$600.00'), findsOneWidget);
+    expect(find.text('Amount lost'), findsOneWidget);
   });
 
   testWidgets('history rendering', (tester) async {
@@ -264,6 +288,7 @@ void main() {
     await tester.pump();
     expect(find.textContaining('ETH/USD-OTC'), findsOneWidget);
     expect(find.textContaining('WIN'), findsWidgets);
+    expect(find.text(r'+$21.25'), findsWidgets);
     expect(find.text('ALL'), findsOneWidget);
     expect(find.text('Your completed trades will appear here.'), findsNothing);
   });

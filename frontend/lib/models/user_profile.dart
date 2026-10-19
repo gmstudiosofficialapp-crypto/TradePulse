@@ -75,6 +75,45 @@ class UserProfile {
     );
   }
 
+  factory UserProfile.fromServer(
+    Map<String, dynamic> json, {
+    UserProfile? current,
+  }) {
+    String read(String key, [String fallback = '']) {
+      final value = json[key];
+      if (value == null) return fallback;
+      final text = '$value'.trim();
+      return text.isEmpty ? fallback : text;
+    }
+
+    DateTime? parseTime(Object? raw) {
+      if (raw == null || '$raw'.trim().isEmpty) return null;
+      return DateTime.tryParse('$raw');
+    }
+
+    final fullName = read('displayName', read('fullName', current?.fullName ?? ''));
+    final created = parseTime(json['createdAt']) ?? current?.memberSince ?? DateTime.now();
+    return UserProfile(
+      uid: read('uid', current?.uid ?? ''),
+      fullName: fullName,
+      email: read('email', current?.email ?? ''),
+      memberSince: created,
+      accountType: current?.accountType ?? 'DEMO',
+      username: read('username', current?.username ?? ''),
+      phone: read('phone', current?.phone ?? ''),
+      dateOfBirth: parseTime(json['dateOfBirth']) ?? current?.dateOfBirth,
+      gender: read('gender', current?.gender ?? ''),
+      country: read('country', current?.country ?? ''),
+      division: read('division', current?.division ?? ''),
+      district: read('district', current?.district ?? ''),
+      thana: read('thana', current?.thana ?? ''),
+      city: read('city', current?.city ?? ''),
+      area: read('area', current?.area ?? ''),
+      fullAddress: read('fullAddress', current?.fullAddress ?? ''),
+      postalCode: read('postalCode', current?.postalCode ?? ''),
+    );
+  }
+
   String get initials {
     final parts = fullName.trim().split(RegExp(r'\s+'));
     if (parts.isEmpty || parts.first.isEmpty) {
