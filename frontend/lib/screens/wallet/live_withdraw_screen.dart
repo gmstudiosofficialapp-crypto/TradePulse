@@ -247,10 +247,6 @@ class _LiveWithdrawScreenState extends State<LiveWithdrawScreen> {
                         label: 'Available Balance',
                         value: AppUtils.formatMoney(live),
                       ),
-                      const _InfoRow(
-                        label: 'Processing time',
-                        value: '2–12 hours',
-                      ),
                     ],
                   ),
                 ),
@@ -293,7 +289,7 @@ class _LiveWithdrawScreenState extends State<LiveWithdrawScreen> {
                     fontWeight: FontWeight.w700,
                   ),
                 ),
-                const SizedBox(height: 8),
+                const SizedBox(height: 10),
                 for (final item in const [
                   WithdrawMethod.btc,
                   WithdrawMethod.usdtTrc20,
@@ -307,9 +303,9 @@ class _LiveWithdrawScreenState extends State<LiveWithdrawScreen> {
                       _error = null;
                     }),
                   ),
-                  const SizedBox(height: 8),
+                  const SizedBox(height: 10),
                 ],
-                const SizedBox(height: 6),
+                const SizedBox(height: 8),
                 Text(
                   'P2P',
                   style: TextStyle(
@@ -317,7 +313,7 @@ class _LiveWithdrawScreenState extends State<LiveWithdrawScreen> {
                     fontWeight: FontWeight.w700,
                   ),
                 ),
-                const SizedBox(height: 8),
+                const SizedBox(height: 10),
                 for (final item in const [
                   WithdrawMethod.bkash,
                   WithdrawMethod.nagad,
@@ -330,7 +326,7 @@ class _LiveWithdrawScreenState extends State<LiveWithdrawScreen> {
                       _error = null;
                     }),
                   ),
-                  const SizedBox(height: 8),
+                  const SizedBox(height: 10),
                 ],
                 const SizedBox(height: 12),
                 Text(
@@ -383,42 +379,82 @@ class _MethodTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colors = context.tpColors;
+    final scheme = Theme.of(context).colorScheme;
+    final p2p = method.category == WithdrawCategory.p2p;
+    final subtitle = method.network ?? 'Mobile wallet';
     return Pressable(
       onPressed: onTap,
+      borderRadius: BorderRadius.circular(18),
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 180),
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        constraints: const BoxConstraints(minHeight: 72),
+        padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
         decoration: BoxDecoration(
-          color: colors.card.withValues(alpha: selected ? 0.98 : 0.88),
-          borderRadius: BorderRadius.circular(14),
+          color: selected ? colors.canvasAlt.withValues(alpha: 0.96) : colors.card.withValues(alpha: 0.82),
+          borderRadius: BorderRadius.circular(18),
           border: Border.all(
-            color: selected ? colors.accent : colors.cardBorder,
-            width: selected ? 1.6 : 1,
+            color: selected ? colors.accent : colors.cardBorder.withValues(alpha: 0.88),
+            width: selected ? 1.8 : 1,
           ),
+          boxShadow: selected
+              ? [
+                  BoxShadow(
+                    color: colors.glow,
+                    blurRadius: 18,
+                    offset: const Offset(0, 8),
+                  ),
+                ]
+              : const [],
         ),
         child: Row(
           children: [
-            AssetIcon(symbol: method.iconSymbol, size: 36),
-            const SizedBox(width: 12),
+            Container(
+              width: p2p ? 64 : 48,
+              height: 48,
+              alignment: Alignment.center,
+              decoration: BoxDecoration(
+                color: colors.inputFill,
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(color: colors.cardBorder.withValues(alpha: 0.7)),
+              ),
+              padding: const EdgeInsets.all(6),
+              child: AssetIcon(
+                symbol: method.iconSymbol,
+                size: p2p ? 36 : 34,
+              ),
+            ),
+            const SizedBox(width: 14),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
                     method.title,
-                    style: const TextStyle(fontWeight: FontWeight.w800),
-                  ),
-                  if (method.network != null)
-                    Text(
-                      method.network!,
-                      style: TextStyle(fontSize: 12, color: colors.mutedText),
+                    style: TextStyle(
+                      fontWeight: FontWeight.w800,
+                      fontSize: 15,
+                      height: 1.2,
+                      color: scheme.onSurface,
                     ),
+                  ),
+                  const SizedBox(height: 3),
+                  Text(
+                    subtitle,
+                    style: TextStyle(
+                      fontSize: 12,
+                      height: 1.2,
+                      color: colors.mutedText,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
                 ],
               ),
             ),
+            const SizedBox(width: 8),
             Icon(
-              selected ? Icons.check_circle : Icons.circle_outlined,
-              color: selected ? colors.accent : colors.mutedText,
+              selected ? Icons.check_circle_rounded : Icons.circle_outlined,
+              size: 22,
+              color: selected ? colors.accent : colors.mutedText.withValues(alpha: 0.7),
             ),
           ],
         ),

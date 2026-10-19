@@ -21,7 +21,9 @@ class AssetIcon extends StatelessWidget {
         child: spec.primaryAsset == null && spec.secondaryAsset == null
             ? _Fallback(spec: spec, size: size)
             : spec.secondaryAsset == null
-                ? _RoundAssetImage(path: spec.primaryAsset!, size: size, fallback: spec)
+                ? spec.circular
+                    ? _RoundAssetImage(path: spec.primaryAsset!, size: size, fallback: spec)
+                    : _ContainAssetImage(path: spec.primaryAsset!, size: size, fallback: spec)
                 : _PairFlags(
                     left: spec.primaryAsset!,
                     right: spec.secondaryAsset!,
@@ -54,6 +56,30 @@ class _RoundAssetImage extends StatelessWidget {
         fit: BoxFit.cover,
         errorBuilder: (_, _, _) => _Fallback(spec: fallback, size: size),
       ),
+    );
+  }
+}
+
+class _ContainAssetImage extends StatelessWidget {
+  const _ContainAssetImage({
+    required this.path,
+    required this.size,
+    required this.fallback,
+  });
+
+  final String path;
+  final double size;
+  final AssetIconSpec fallback;
+
+  @override
+  Widget build(BuildContext context) {
+    return Image.asset(
+      path,
+      width: size,
+      height: size,
+      fit: BoxFit.contain,
+      filterQuality: FilterQuality.high,
+      errorBuilder: (_, _, _) => _Fallback(spec: fallback, size: size),
     );
   }
 }
@@ -127,18 +153,21 @@ class AssetIconSpec {
     required this.letters,
     this.primaryAsset,
     this.secondaryAsset,
+    this.circular = true,
   });
 
   final Color color;
   final String letters;
   final String? primaryAsset;
   final String? secondaryAsset;
+  final bool circular;
 }
 
 class AssetIconCatalog {
   static AssetIconSpec of(String symbol) {
     const crypto = 'assets/icons/crypto';
     const flags = 'assets/icons/flags';
+    const payments = 'assets/icons/payments';
     return switch (symbol) {
       'BTC/USD-OTC' => const AssetIconSpec(
           color: Color(0xFFF7931A),
@@ -168,10 +197,14 @@ class AssetIconCatalog {
       'BKASH' => const AssetIconSpec(
           color: Color(0xFFE2136E),
           letters: 'bK',
+          primaryAsset: '$payments/bkash.png',
+          circular: false,
         ),
       'NAGAD' => const AssetIconSpec(
           color: Color(0xFFF58220),
           letters: 'NG',
+          primaryAsset: '$payments/nagad.png',
+          circular: false,
         ),
       'USDC' => const AssetIconSpec(
           color: Color(0xFF2775CA),

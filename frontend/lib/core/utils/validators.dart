@@ -68,7 +68,7 @@ class Validators {
   static const withdrawSubmittedTitle = '🎉 Withdrawal Request Submitted!';
   static const withdrawSubmittedBody =
       'Thank you! Your withdrawal request has been successfully received.\n'
-      'Your withdrawal will be processed within 2–12 hours.\n'
+      'Your withdrawal will be processed within 15 minutes to 7 days.\n'
       'Thank you.';
   static const withdrawRejectionRequired = 'Please enter a rejection reason.';
   static const withdrawDepositRequired =

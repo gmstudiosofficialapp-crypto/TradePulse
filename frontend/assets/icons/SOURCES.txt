@@ -10,3 +10,9 @@ ISO flag PNGs from Flagcdn, stored locally for EUR, GBP, USD, JPY, AUD, CAD, CHF
 ## Other assets
 GOLD, SILVER, NASDAQ, S&P500, and DOW JONES use a clean generic fallback
 because authentic trademarked index/commodity marks are not bundled.
+
+## Payment methods
+Official bKash and Nagad logos were taken from the brand files hosted on
+Bangla Wikipedia (sourced there from bkash.com and nagad.com.bd) and stored
+locally as transparent PNGs for method identification only. bKash and Nagad
+remain trademarks of their owners.

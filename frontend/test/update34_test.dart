@@ -157,6 +157,8 @@ void main() {
     expect(AssetIconCatalog.of('BTC').primaryAsset, contains('btc.png'));
     expect(AssetIconCatalog.of('USDT').primaryAsset, contains('usdt.png'));
     expect(AssetIconCatalog.of('USDC').primaryAsset, contains('usdc.png'));
+    expect(AssetIconCatalog.of('BKASH').primaryAsset, contains('bkash.png'));
+    expect(AssetIconCatalog.of('NAGAD').primaryAsset, contains('nagad.png'));
     expect(AssetIconCatalog.of('NASDAQ-OTC').primaryAsset, isNull);
   });
 

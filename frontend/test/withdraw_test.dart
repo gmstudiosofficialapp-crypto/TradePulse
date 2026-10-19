@@ -292,6 +292,12 @@ void main() {
       Validators.withdrawPaymentDetails('01812345678', WithdrawMethod.nagad),
       isNull,
     );
+    expect(
+      Validators.withdrawSubmittedBody,
+      contains('15 minutes to 7 days'),
+    );
+    expect(Validators.withdrawSubmittedBody.contains('2–12 hours'), isFalse);
+    expect(Validators.withdrawSubmittedBody.toLowerCase().contains('guaranteed'), isFalse);
   });
 
   testWidgets('withdraw form validates amount before submit', (tester) async {
@@ -303,6 +309,9 @@ void main() {
     expect(find.text('Submit Withdrawal'), findsOneWidget);
     expect(find.text('Crypto'), findsOneWidget);
     expect(find.text('P2P'), findsOneWidget);
+    expect(find.text('Processing time'), findsNothing);
+    expect(find.textContaining('2–12 hours'), findsNothing);
+    expect(find.textContaining('15 minutes'), findsNothing);
     expect(find.text('Bangladesh'), findsNothing);
     await tester.enterText(find.widgetWithText(TextFormField, 'Amount'), '20');
     await _submit(tester);

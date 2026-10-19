@@ -25,6 +25,7 @@ from app.services.withdraw import (
     STATUS_PENDING,
     STATUS_REJECTED,
     STATUS_SUCCESSFUL,
+    SUBMITTED_MESSAGE,
     usd_to_bdt,
     validate_btc_address,
     validate_eth_address,
@@ -97,6 +98,11 @@ def test_valid_crypto_and_p2p_withdrawals() -> None:
         assert btc.status_code == 200
         assert btc.json()["request_created"] is True
         assert btc.json()["request"]["status"] == STATUS_PENDING
+        assert "15 minutes to 7 days" in btc.json()["message"]
+        assert "2–12 hours" not in btc.json()["message"]
+        assert "guaranteed" not in btc.json()["message"].lower()
+        assert "15 minutes to 7 days" in SUBMITTED_MESSAGE
+        assert SUBMITTED_MESSAGE == btc.json()["message"]
         assert engine.live_balance("withdraw-user") == 350
         assert engine.balance("withdraw-user") == before_demo
 
