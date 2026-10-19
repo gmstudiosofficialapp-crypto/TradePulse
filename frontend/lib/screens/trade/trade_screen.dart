@@ -960,6 +960,33 @@ class _ResultFlash extends StatelessWidget {
                     fontSize: 11,
                   ),
                 ),
+            ] else if (result == 'DRAW' && caption.isNotEmpty)
+              Text(
+                caption,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.w600,
+                  fontSize: 11,
+                ),
+              ),
+            if (win || loss || result == 'DRAW') ...[
+              const SizedBox(height: 4),
+              Text(
+                'Stake ${AppUtils.formatMoney(trade.stake)} · ${trade.payoutLabel}',
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.w600,
+                  fontSize: 11,
+                ),
+              ),
+              Text(
+                'Return ${AppUtils.formatMoney(trade.settledTotalReturn)}',
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.w700,
+                  fontSize: 12,
+                ),
+              ),
             ],
           ],
         ),

@@ -44,20 +44,22 @@ def _compute_settlement(trade: dict, expiry_price: float) -> tuple[dict, float, 
     credit = 0.0
     txn_type = None
     if result == "WIN":
-        profit = round(stake * rate, 2)
-        credit = stake + profit
+        profit = round(float(stake) * float(rate), 2)
+        credit = round(float(stake) + profit, 2)
         pnl = profit
         txn_type = "TRADE_PAYOUT"
     elif result == "DRAW":
-        credit = stake
+        credit = round(float(stake), 2)
         pnl = 0.0
         txn_type = "TRADE_REFUND"
     else:
-        pnl = -stake
+        pnl = -round(float(stake), 2)
     updated = dict(trade)
     updated["expiry_price"] = expiry_price
     updated["result"] = result
     updated["profit_loss"] = pnl
+    updated["total_return"] = credit
+    updated["payout_rate"] = float(rate)
     updated["status"] = "CLOSED"
     extra = None
     if txn_type is not None:
@@ -243,6 +245,7 @@ class DemoTradingEngine:
             "payout_rate": payout_rate_for(asset, self.settings.payout_rate),
             "result": None,
             "profit_loss": 0.0,
+            "total_return": 0.0,
             "status": "OPEN",
             "created_at": moment.isoformat(),
             "simulated": True,

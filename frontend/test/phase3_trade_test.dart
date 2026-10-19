@@ -229,13 +229,42 @@ void main() {
       expiryPrice: 66900,
       result: 'WIN',
       profitLoss: 8.5,
+      payoutRate: 0.85,
+      totalReturn: 18.5,
     );
     await tester.pumpWidget(_harness(child: const TradeScreen(), trading: trading));
     await tester.pump();
     expect(find.text('WIN'), findsWidgets);
     expect(find.text(r'+$8.50'), findsOneWidget);
     expect(find.text('Profit earned'), findsOneWidget);
+    expect(find.textContaining('Stake \$10.00 · 85%'), findsOneWidget);
+    expect(find.text(r'Return $18.50'), findsOneWidget);
     expect(find.textContaining('BTC/USD-OTC   P/L'), findsNothing);
+  });
+
+  testWidgets('win result shows stored 92 percent profit and total return', (tester) async {
+    final trading = TradingController(_FakeTrading());
+    trading.lastResult = DemoTrade(
+      tradeId: 't-win-92',
+      asset: 'BTC/USD-OTC',
+      direction: 'BUY',
+      stake: 10,
+      entryPrice: 67000,
+      entryTime: DateTime.now().toUtc(),
+      expiryTime: DateTime.now().toUtc(),
+      status: 'CLOSED',
+      expiryPrice: 67100,
+      result: 'WIN',
+      profitLoss: 9.2,
+      payoutRate: 0.92,
+      totalReturn: 19.2,
+    );
+    await tester.pumpWidget(_harness(child: const TradeScreen(), trading: trading));
+    await tester.pump();
+    expect(find.text('WIN'), findsWidgets);
+    expect(find.text(r'+$9.20'), findsOneWidget);
+    expect(find.text(r'Return $19.20'), findsOneWidget);
+    expect(find.textContaining('Stake \$10.00 · 92%'), findsOneWidget);
   });
 
   testWidgets('loss result uses settled profit_loss', (tester) async {
@@ -275,6 +304,8 @@ void main() {
         expiryPrice: 3210,
         result: 'WIN',
         profitLoss: 21.25,
+        payoutRate: 0.85,
+        totalReturn: 46.25,
         expirySeconds: 30,
       ),
     ];
@@ -289,6 +320,8 @@ void main() {
     expect(find.textContaining('ETH/USD-OTC'), findsOneWidget);
     expect(find.textContaining('WIN'), findsWidgets);
     expect(find.text(r'+$21.25'), findsWidgets);
+    expect(find.text(r'$46.25'), findsWidgets);
+    expect(find.text('85%'), findsWidgets);
     expect(find.text('ALL'), findsOneWidget);
     expect(find.text('Your completed trades will appear here.'), findsNothing);
   });

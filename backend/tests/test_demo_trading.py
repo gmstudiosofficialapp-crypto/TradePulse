@@ -1,3 +1,4 @@
+from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timedelta, timezone
 
 import pytest
@@ -118,6 +119,8 @@ def test_payout_calculation() -> None:
     settled = engine.settle(trade["trade_id"], 51)
     assert settled["payout_rate"] == 0.92
     assert settled["profit_loss"] == 18.4
+    assert settled["total_return"] == 38.4
+    assert engine.balance("dave") == 10018.4
 
 
 def test_trade_settlement_and_history() -> None:
@@ -275,6 +278,87 @@ def test_custom_expiry_durations() -> None:
         )
     with pytest.raises(ValueError, match="Invalid expiry"):
         engine.open_trade("exp", "BTC/USD-OTC", "BUY", 10, 100, expiry_seconds=7)
+
+
+def test_dynamic_payout_stakes_and_asset_rates() -> None:
+    engine = DemoTradingEngine()
+    cases = [
+        ("ten", "BTC/USD-OTC", 10.0, 9.2, 19.2, 10009.2),
+        ("hundred", "BTC/USD-OTC", 100.0, 92.0, 192.0, 10092.0),
+        ("thousand", "BTC/USD-OTC", 1000.0, 920.0, 1920.0, 10920.0),
+        ("dow", "DOW JONES-OTC", 100.0, 80.0, 180.0, 10080.0),
+        ("xrp", "XRP/USD-OTC", 10.0, 9.0, 19.0, 10009.0),
+    ]
+    for user, asset, stake, profit, total, final in cases:
+        trade = engine.open_trade(user, asset, "BUY", stake, 100)
+        assert engine.balance(user) == round(10000 - stake, 2)
+        settled = engine.settle(trade["trade_id"], 101)
+        assert settled["result"] == "WIN"
+        assert settled["payout_rate"] == ASSET_PAYOUT_RATES[asset]
+        assert settled["profit_loss"] == profit
+        assert settled["total_return"] == total
+        assert engine.balance(user) == final
+
+
+def test_win_credits_total_return_from_custom_start() -> None:
+    engine = DemoTradingEngine()
+    engine.accounts.set_balance("pat", 2000)
+    trade = engine.open_trade("pat", "BTC/USD-OTC", "BUY", 1000, 50)
+    assert engine.balance("pat") == 1000.0
+    settled = engine.settle(trade["trade_id"], 51)
+    assert settled["profit_loss"] == 920.0
+    assert settled["total_return"] == 1920.0
+    assert engine.balance("pat") == 2920.0
+
+
+def test_loss_and_draw_balances_match_settlement() -> None:
+    engine = DemoTradingEngine()
+    loss = engine.open_trade("lee", "DOGE/USD-OTC", "BUY", 100, 10)
+    assert loss["payout_rate"] == 0.85
+    settled_loss = engine.settle(loss["trade_id"], 9)
+    assert settled_loss["result"] == "LOSS"
+    assert settled_loss["profit_loss"] == -100
+    assert settled_loss["total_return"] == 0.0
+    assert engine.balance("lee") == 9900.0
+    draw = engine.open_trade("lee", "DOGE/USD-OTC", "SELL", 50, 10)
+    settled_draw = engine.settle(draw["trade_id"], 10)
+    assert settled_draw["result"] == "DRAW"
+    assert settled_draw["profit_loss"] == 0.0
+    assert settled_draw["total_return"] == 50.0
+    assert engine.balance("lee") == 9900.0
+
+
+def test_opened_payout_rate_is_frozen() -> None:
+    engine = DemoTradingEngine()
+    trade = engine.open_trade("zoe", "BTC/USD-OTC", "BUY", 10, 100)
+    previous = ASSET_PAYOUT_RATES["BTC/USD-OTC"]
+    ASSET_PAYOUT_RATES["BTC/USD-OTC"] = 0.5
+    try:
+        settled = engine.settle(trade["trade_id"], 110)
+        assert settled["payout_rate"] == 0.92
+        assert settled["profit_loss"] == 9.2
+        assert settled["total_return"] == 19.2
+        assert engine.balance("zoe") == 10009.2
+    finally:
+        ASSET_PAYOUT_RATES["BTC/USD-OTC"] = previous
+
+
+def test_concurrent_settle_does_not_double_credit() -> None:
+    engine = DemoTradingEngine()
+    trade = engine.open_trade("ray", "BTC/USD-OTC", "BUY", 100, 100)
+
+    def _settle(_: int) -> dict:
+        return engine.settle(trade["trade_id"], 110)
+
+    with ThreadPoolExecutor(max_workers=8) as pool:
+        rows = list(pool.map(_settle, range(16)))
+    assert {row["result"] for row in rows} == {"WIN"}
+    assert {row["profit_loss"] for row in rows} == {92.0}
+    assert {row["total_return"] for row in rows} == {192.0}
+    assert engine.balance("ray") == 10092.0
+    history = [item for item in engine.trades.list_for_user("ray") if item["trade_id"] == trade["trade_id"]]
+    assert len(history) == 1
+    assert history[0]["total_return"] == 192.0
 
 
 def test_live_trading_rejection() -> None:

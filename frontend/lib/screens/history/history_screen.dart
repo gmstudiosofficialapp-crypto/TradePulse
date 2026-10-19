@@ -137,6 +137,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
                                 '${AppUtils.formatPrice(entry.value.entryPrice)} → ${entry.value.expiryPrice == null ? 'pending' : AppUtils.formatPrice(entry.value.expiryPrice!)}',
                               ),
                               _Meta('Stake', AppUtils.formatMoney(entry.value.stake)),
+                              _Meta('Payout', entry.value.payoutLabel),
                               _Meta(
                                 'Duration',
                                 AppUtils.formatExpiryLabel(entry.value.durationSeconds),
@@ -145,6 +146,11 @@ class _HistoryScreenState extends State<HistoryScreen> {
                                 'P/L',
                                 AppUtils.formatSignedMoney(entry.value.profitLoss),
                               ),
+                              if (entry.value.result != null)
+                                _Meta(
+                                  'Return',
+                                  AppUtils.formatMoney(entry.value.settledTotalReturn),
+                                ),
                               _Meta('Opened', AppUtils.formatStamp(entry.value.entryTime)),
                               _Meta('Expiry', AppUtils.formatStamp(entry.value.expiryTime)),
                             ],

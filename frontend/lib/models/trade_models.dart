@@ -72,6 +72,7 @@ class DemoTrade {
     this.expiryPrice,
     this.result,
     this.profitLoss = 0,
+    this.totalReturn,
     this.payoutRate = 0.85,
     this.expirySeconds = 60,
     this.accountType = 'DEMO',
@@ -88,11 +89,28 @@ class DemoTrade {
   final double? expiryPrice;
   final String? result;
   final double profitLoss;
+  final double? totalReturn;
   final double payoutRate;
   final int expirySeconds;
   final String accountType;
 
   bool get isOpen => result == null && status == 'OPEN';
+
+  String get payoutLabel {
+    final percent = payoutRate * 100;
+    if ((percent - percent.round()).abs() < 0.005) {
+      return '${percent.round()}%';
+    }
+    return '${percent.toStringAsFixed(2)}%';
+  }
+
+  double get settledTotalReturn {
+    if (totalReturn != null) return totalReturn!;
+    if (result == 'WIN') return stake + profitLoss;
+    if (result == 'DRAW') return stake;
+    if (result == 'LOSS') return 0;
+    return 0;
+  }
 
   int get durationSeconds {
     if (expirySeconds > 0) return expirySeconds;
@@ -112,6 +130,7 @@ class DemoTrade {
       expiryPrice: (json['expiry_price'] as num?)?.toDouble(),
       result: json['result'] as String?,
       profitLoss: (json['profit_loss'] as num?)?.toDouble() ?? 0,
+      totalReturn: (json['total_return'] as num?)?.toDouble(),
       payoutRate: (json['payout_rate'] as num?)?.toDouble() ?? 0.85,
       expirySeconds: (json['expiry_seconds'] as num?)?.toInt() ??
           DateTime.parse(json['expiry_time'] as String)
