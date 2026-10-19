@@ -131,10 +131,10 @@ class _HistoryTile extends StatelessWidget {
     };
     return PremiumCard(
       onTap: onTap,
-      padding: const EdgeInsets.fromLTRB(16, 14, 12, 14),
+      padding: const EdgeInsets.fromLTRB(14, 12, 12, 12),
       child: Row(
         children: [
-          AssetIcon(symbol: request.method.iconSymbol, size: 40),
+          AssetIcon(symbol: request.method.iconSymbol, size: 36),
           const SizedBox(width: 12),
           Expanded(
             child: Column(
@@ -142,63 +142,57 @@ class _HistoryTile extends StatelessWidget {
               children: [
                 Text(
                   request.method.title,
-                  style: const TextStyle(fontWeight: FontWeight.w800),
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  request.requestId,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: TextStyle(fontSize: 12, color: colors.mutedText),
+                  style: const TextStyle(
+                    fontWeight: FontWeight.w800,
+                    fontSize: 15,
+                    height: 1.2,
+                  ),
                 ),
+                const SizedBox(height: 4),
                 Text(
                   '${AppUtils.formatMoney(request.amountUsd)} USD',
-                  style: const TextStyle(fontWeight: FontWeight.w700),
-                ),
-                Text(
-                  request.paymentDetails,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: TextStyle(fontSize: 12, color: colors.mutedText),
+                  style: const TextStyle(
+                    fontWeight: FontWeight.w700,
+                    fontSize: 14,
+                  ),
                 ),
-                if (request.createdStamp != null)
+                if (request.createdStamp != null) ...[
+                  const SizedBox(height: 3),
                   Text(
                     AppUtils.formatDetailStamp(request.createdStamp!),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                     style: TextStyle(fontSize: 12, color: colors.mutedText),
                   ),
-                if (request.status == WithdrawStatus.rejected &&
-                    (request.rejectionReason ?? '').trim().isNotEmpty)
-                  Text(
-                    request.rejectionReason!,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(fontSize: 12, color: colors.danger),
-                  ),
+                ],
               ],
             ),
           ),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.end,
-            children: [
-              Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                decoration: BoxDecoration(
-                  color: color.withValues(alpha: 0.14),
-                  borderRadius: BorderRadius.circular(16),
-                ),
-                child: Text(
-                  request.status.badgeLabel,
-                  style: TextStyle(
-                    color: color,
-                    fontWeight: FontWeight.w800,
-                    fontSize: 11,
-                  ),
+          const SizedBox(width: 8),
+          ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 112),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+              decoration: BoxDecoration(
+                color: color.withValues(alpha: 0.14),
+                borderRadius: BorderRadius.circular(16),
+              ),
+              child: Text(
+                request.status.badgeLabel,
+                textAlign: TextAlign.center,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  color: color,
+                  fontWeight: FontWeight.w800,
+                  fontSize: 11,
                 ),
               ),
-              const SizedBox(height: 8),
-              Icon(Icons.chevron_right_rounded, color: colors.mutedText),
-            ],
+            ),
           ),
         ],
       ),

@@ -545,8 +545,15 @@ void main() {
     expect(find.text('Withdrawal History'), findsOneWidget);
     expect(find.text('USDT (TRC20)'), findsOneWidget);
     expect(find.text(r'$1,000.00 USD'), findsOneWidget);
-    expect(find.text('wd-hist'), findsOneWidget);
     expect(find.text('Under Review'), findsOneWidget);
+    expect(
+      find.text(AppUtils.formatDetailStamp(DateTime.utc(2026, 8, 24, 16, 15))),
+      findsOneWidget,
+    );
+    expect(find.text('wd-hist'), findsNothing);
+    expect(find.text('THfnsscby3ZW3LPGbTyGLyLkFsFdRwV5Xq'), findsNothing);
+    expect(find.text('TRON (TRC20)'), findsNothing);
+    expect(find.text('In progress'), findsNothing);
   });
 
   testWidgets('five taps on withdraw title opens admin login', (tester) async {
