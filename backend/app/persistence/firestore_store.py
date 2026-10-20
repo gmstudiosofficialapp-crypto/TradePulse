@@ -490,6 +490,124 @@ class FirestoreWithdrawalStore:
         return _apply(self._db.transaction())
 
 
+class FirestoreDepositStore:
+    def __init__(self, db, accounts: FirestoreAccountStore) -> None:
+        self._db = db
+        self.accounts = accounts
+
+    def _ref(self, request_id: str):
+        return self._db.collection("deposits").document(request_id)
+
+    def get(self, request_id: str) -> dict | None:
+        snap = self._ref(request_id).get()
+        if not snap.exists:
+            return None
+        return snap.to_dict()
+
+    def list_for_user(self, user_id: str) -> list[dict]:
+        rows = [
+            doc.to_dict() or {}
+            for doc in self._db.collection("deposits").where("user_id", "==", user_id).stream()
+        ]
+        return sorted(rows, key=lambda item: item.get("created_at", ""), reverse=True)
+
+    def list_all(self) -> list[dict]:
+        rows = [doc.to_dict() or {} for doc in self._db.collection("deposits").stream()]
+        return sorted(rows, key=lambda item: item.get("created_at", ""), reverse=True)
+
+    def create_pending(self, row: dict) -> dict:
+        stored = dict(row)
+        stored["credited"] = False
+        self._ref(stored["request_id"]).set(stored)
+        return stored
+
+    def approve(self, request_id: str, admin_username: str) -> tuple[dict, float]:
+        from app.services.deposit import (
+            MSG_ALREADY_REJECTED,
+            MSG_NOT_FOUND,
+            STATUS_PENDING,
+            STATUS_REJECTED,
+            STATUS_SUCCESSFUL,
+            DepositError,
+        )
+
+        deposit_ref = self._ref(request_id)
+
+        @firestore.transactional
+        def _apply(txn) -> tuple[dict, float]:
+            snap = deposit_ref.get(transaction=txn)
+            if not snap.exists:
+                raise DepositError(MSG_NOT_FOUND, "not_found")
+            row = snap.to_dict() or {}
+            account_ref = self._db.collection("accounts").document(row["user_id"])
+            acc = account_ref.get(transaction=txn)
+            acc_data = acc.to_dict() or {} if acc.exists else {}
+            live = float(acc_data.get("live_balance", 0.0)) if acc.exists else 0.0
+            if row.get("status") == STATUS_SUCCESSFUL:
+                return row, live
+            if row.get("status") == STATUS_REJECTED:
+                raise DepositError(MSG_ALREADY_REJECTED, "conflict")
+            if row.get("status") != STATUS_PENDING:
+                raise DepositError(MSG_ALREADY_REJECTED, "conflict")
+            if not row.get("credited"):
+                live = round(live + float(row.get("amount_usd") or 0), 2)
+                row["credited"] = True
+            now = _now()
+            row["status"] = STATUS_SUCCESSFUL
+            row["updated_at"] = now
+            row["processed_at"] = now
+            row["processed_by"] = admin_username
+            txn.set(deposit_ref, row)
+            txn.set(
+                account_ref,
+                {"uid": row["user_id"], "live_balance": live, "updatedAt": now},
+                merge=True,
+            )
+            return row, live
+
+        return _apply(self._db.transaction())
+
+    def reject(self, request_id: str, admin_username: str, reason: str) -> tuple[dict, float]:
+        from app.services.deposit import (
+            MSG_ALREADY_SUCCESSFUL,
+            MSG_NOT_FOUND,
+            STATUS_PENDING,
+            STATUS_REJECTED,
+            STATUS_SUCCESSFUL,
+            DepositError,
+        )
+
+        deposit_ref = self._ref(request_id)
+
+        @firestore.transactional
+        def _apply(txn) -> tuple[dict, float]:
+            snap = deposit_ref.get(transaction=txn)
+            if not snap.exists:
+                raise DepositError(MSG_NOT_FOUND, "not_found")
+            row = snap.to_dict() or {}
+            account_ref = self._db.collection("accounts").document(row["user_id"])
+            acc = account_ref.get(transaction=txn)
+            acc_data = acc.to_dict() or {} if acc.exists else {}
+            live = float(acc_data.get("live_balance", 0.0)) if acc.exists else 0.0
+            if row.get("status") == STATUS_REJECTED:
+                return row, live
+            if row.get("status") == STATUS_SUCCESSFUL or row.get("credited"):
+                raise DepositError(MSG_ALREADY_SUCCESSFUL, "conflict")
+            if row.get("status") != STATUS_PENDING:
+                raise DepositError(MSG_ALREADY_SUCCESSFUL, "conflict")
+            now = _now()
+            row["status"] = STATUS_REJECTED
+            row["rejection_reason"] = reason
+            row["credited"] = False
+            row["updated_at"] = now
+            row["processed_at"] = now
+            row["processed_by"] = admin_username
+            txn.set(deposit_ref, row)
+            return row, live
+
+        return _apply(self._db.transaction())
+
+
 def build_firestore_stores(initial_balance: float, db=None):
     client = db or firestore_client()
     accounts = FirestoreAccountStore(client, initial_balance)
@@ -497,4 +615,5 @@ def build_firestore_stores(initial_balance: float, db=None):
     transactions = FirestoreTransactionStore(client)
     ledger = FirestoreLedger(client, accounts, trades, transactions)
     withdrawals = FirestoreWithdrawalStore(client, accounts)
-    return accounts, trades, transactions, ledger, withdrawals
+    deposits = FirestoreDepositStore(client, accounts)
+    return accounts, trades, transactions, ledger, withdrawals, deposits

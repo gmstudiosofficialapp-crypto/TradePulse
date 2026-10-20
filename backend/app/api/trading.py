@@ -14,6 +14,12 @@ from app.core.runtime import (
 )
 from app.services.demo_trading import BOOK_LIVE
 from app.services.leaderboard import build_daily_leaderboard
+from app.services.deposit import (
+    DepositError,
+    create_deposit,
+    get_user_deposit,
+    list_user_deposits,
+)
 from app.services.withdraw import (
     WithdrawError,
     create_withdrawal,
@@ -36,12 +42,28 @@ class DemoCreditBody(BaseModel):
     amount: float = Field(gt=0, le=1_000_000)
 
 
+class DepositRequestBody(BaseModel):
+    amount: Any = None
+    method: Any = None
+    txid: Any = None
+    user_id: Any = None
+
+
 class WithdrawRequestBody(BaseModel):
     amount: Any = None
     method: Any = None
     address: Any = None
     payment_details: Any = None
     user_id: Any = None
+
+
+def _deposit_http(error: DepositError) -> None:
+    status = 400
+    if error.code == "not_found":
+        status = 404
+    elif error.code in ("pending", "conflict"):
+        status = 409
+    raise HTTPException(status_code=status, detail=error.message)
 
 
 def _withdraw_http(error: WithdrawError) -> None:
@@ -213,6 +235,37 @@ def create_live_withdraw(body: WithdrawRequestBody, user: AuthUser) -> dict:
 def list_live_withdrawals(user: AuthUser) -> dict:
     _bootstrap(user)
     return {"withdrawals": list_user_withdrawals(user.uid)}
+
+
+@router.post("/live/deposits")
+def create_live_deposit(body: DepositRequestBody, user: AuthUser) -> dict:
+    _bootstrap(user)
+    try:
+        return create_deposit(
+            user_id=user.uid,
+            amount=body.amount,
+            method=body.method,
+            txid=body.txid,
+        )
+    except DepositError as exc:
+        _deposit_http(exc)
+        raise
+
+
+@router.get("/live/deposits")
+def list_live_deposits(user: AuthUser) -> dict:
+    _bootstrap(user)
+    return {"deposits": list_user_deposits(user.uid)}
+
+
+@router.get("/live/deposits/{request_id}")
+def get_live_deposit(request_id: str, user: AuthUser) -> dict:
+    _bootstrap(user)
+    try:
+        return {"request": get_user_deposit(user.uid, request_id)}
+    except DepositError as exc:
+        _deposit_http(exc)
+        raise
 
 
 @router.get("/live/withdrawals/{request_id}")

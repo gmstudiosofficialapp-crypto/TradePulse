@@ -14,6 +14,7 @@ import 'package:tradepulse_frontend/core/services/trading_service.dart';
 import 'package:tradepulse_frontend/core/theme/app_theme.dart';
 import 'package:tradepulse_frontend/core/utils/app_utils.dart';
 import 'package:tradepulse_frontend/core/utils/validators.dart';
+import 'package:tradepulse_frontend/models/deposit_models.dart';
 import 'package:tradepulse_frontend/models/live_wallet_models.dart';
 import 'package:tradepulse_frontend/screens/home/home_screen.dart';
 import 'package:tradepulse_frontend/screens/wallet/live_deposit_confirm_screen.dart';
@@ -27,6 +28,49 @@ import 'package:tradepulse_frontend/widgets/cards/demo_balance_card.dart';
 class _SilentTrading extends TradingService {
   @override
   Future<void> ensureAccount() async {}
+}
+
+class _DepositTrading extends TradingService {
+  @override
+  Future<void> ensureAccount() async {}
+
+  @override
+  Future<Map<String, dynamic>> createDeposit({
+    required double amount,
+    required String method,
+    required String txid,
+  }) async {
+    return {
+      'message': 'Your request is under review.',
+      'balance_credited': false,
+      'live_balance': 0,
+      'request': {
+        'request_id': 'dep-1',
+        'amount_usd': amount,
+        'payment_method': method,
+        'network': 'Bitcoin',
+        'txid': txid,
+        'status': 'Pending',
+        'credited': false,
+        'created_at': '2026-08-24T16:15:00Z',
+        'updated_at': '2026-08-24T16:15:00Z',
+      },
+    };
+  }
+
+  @override
+  Future<DepositRequest> getDeposit(String requestId) async {
+    return DepositRequest.fromJson({
+      'request_id': requestId,
+      'amount_usd': 100,
+      'payment_method': 'btc',
+      'network': 'Bitcoin',
+      'txid': 'abcxyz7iZiy6Y3zt',
+      'status': 'Pending',
+      'created_at': '2026-08-24T16:15:00Z',
+      'updated_at': '2026-08-24T16:15:00Z',
+    });
+  }
 }
 
 Widget _app({
@@ -167,11 +211,10 @@ void main() {
   });
 
   test('live deposit amount bounds', () {
-    expect(Validators.liveDepositAmount('49.99'), isNotNull);
-    expect(Validators.liveDepositAmount('50'), isNull);
+    expect(Validators.liveDepositAmount('99.99'), 'Minimum deposit is \$100.00.');
     expect(Validators.liveDepositAmount('100'), isNull);
-    expect(Validators.liveDepositAmount('5000'), isNull);
-    expect(Validators.liveDepositAmount('5000.01'), isNotNull);
+    expect(Validators.liveDepositAmount('10000'), isNull);
+    expect(Validators.liveDepositAmount('10000.01'), 'Maximum deposit is \$10,000.00.');
   });
 
   test('placeholder addresses match selected assets', () {
@@ -405,7 +448,12 @@ void main() {
     final auth = await _auth(tester);
     final wallet = LiveWalletController();
     await tester.pumpWidget(
-      _app(auth: auth, wallet: wallet, home: const LiveDepositScreen()),
+      _app(
+        auth: auth,
+        wallet: wallet,
+        trading: TradingController(_DepositTrading()),
+        home: const LiveDepositScreen(),
+      ),
     );
     await tester.pump();
     await tester.dragUntilVisible(
@@ -413,16 +461,16 @@ void main() {
       find.byType(ListView).first,
       const Offset(0, -120),
     );
-    await tester.enterText(find.widgetWithText(TextFormField, 'Custom amount'), '49.99');
+    await tester.enterText(find.widgetWithText(TextFormField, 'Custom amount'), '99.99');
     await tester.ensureVisible(find.widgetWithText(FilledButton, 'Continue'));
     await tester.tap(find.widgetWithText(FilledButton, 'Continue'));
     await tester.pump();
-    expect(find.text('Minimum deposit is \$50.'), findsOneWidget);
+    expect(find.text('Minimum deposit is \$100.00.'), findsOneWidget);
 
-    await tester.enterText(find.widgetWithText(TextFormField, 'Custom amount'), '5000.01');
+    await tester.enterText(find.widgetWithText(TextFormField, 'Custom amount'), '10000.01');
     await tester.tap(find.widgetWithText(FilledButton, 'Continue'));
     await tester.pump();
-    expect(find.text('Maximum deposit is \$5,000.'), findsOneWidget);
+    expect(find.text('Maximum deposit is \$10,000.00.'), findsOneWidget);
 
     await tester.enterText(find.widgetWithText(TextFormField, 'Custom amount'), '100');
     await tester.tap(find.widgetWithText(FilledButton, 'Continue'));
@@ -435,11 +483,15 @@ void main() {
     await tester.tap(find.text('Submit Deposit'));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 400));
-    expect(find.text('Deposit — Bitcoin'), findsOneWidget);
-    expect(find.textContaining('TXID:'), findsOneWidget);
-    expect(find.text('🟡 Pending'), findsOneWidget);
+    expect(find.text('Deposit request submitted'), findsOneWidget);
+    await tester.tap(find.text('OK'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 400));
+    expect(find.text('Deposit details'), findsOneWidget);
+    expect(find.text('Under Review'), findsOneWidget);
+    expect(find.text('abcxyz7iZiy6Y3zt'), findsOneWidget);
     expect(LiveWalletController.liveBalance, 0);
-    expect(wallet.transfers, hasLength(1));
+    expect(wallet.transfers, isEmpty);
   });
 
   testWidgets('confirm deposit shows the selected draft amount', (tester) async {

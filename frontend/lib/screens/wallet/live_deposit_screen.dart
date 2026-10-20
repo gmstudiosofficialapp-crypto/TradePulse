@@ -23,11 +23,11 @@ class LiveDepositScreen extends StatefulWidget {
 
 class _LiveDepositScreenState extends State<LiveDepositScreen> {
   final _formKey = GlobalKey<FormState>();
-  final _amount = TextEditingController(text: '50');
+  final _amount = TextEditingController(text: '100');
   LivePaymentAsset _asset = LivePaymentAsset.btc;
   String? _error;
 
-  static const _presets = [50.0, 100.0, 250.0, 500.0, 1000.0, 2500.0, 5000.0];
+  static const _presets = [100.0, 250.0, 500.0, 1000.0, 2500.0, 5000.0, 10000.0];
 
   @override
   void dispose() {
@@ -60,7 +60,7 @@ class _LiveDepositScreenState extends State<LiveDepositScreen> {
         actions: [
           IconButton(
             tooltip: 'Deposit & Withdraw History',
-            onPressed: () => Navigator.of(context).pushNamed(AppRoutes.liveTransfers),
+            onPressed: () => Navigator.of(context).pushNamed(AppRoutes.depositHistory),
             icon: const Icon(Icons.receipt_long_outlined),
           ),
         ],
@@ -109,6 +109,11 @@ class _LiveDepositScreenState extends State<LiveDepositScreen> {
                 ),
                 const SizedBox(height: 8),
               ],
+              const SizedBox(height: 12),
+              Text(
+                'Minimum deposit \$100.00  ·  Maximum deposit \$10,000.00',
+                style: TextStyle(color: colors.mutedText, fontWeight: FontWeight.w700),
+              ),
               const SizedBox(height: 12),
               Text(
                 'Amount',

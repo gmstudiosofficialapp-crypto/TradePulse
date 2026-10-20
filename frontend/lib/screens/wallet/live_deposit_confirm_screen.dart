@@ -3,6 +3,8 @@ import 'package:flutter/services.dart';
 
 import '../../core/routes/app_routes.dart';
 import '../../core/services/app_scope.dart';
+import '../../core/services/trading_service.dart';
+import '../../models/deposit_models.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/utils/app_utils.dart';
 import '../../models/live_wallet_models.dart';
@@ -55,13 +57,39 @@ class _LiveDepositConfirmScreenState extends State<LiveDepositConfirmScreen> {
       _error = null;
     });
     try {
-      await AppScope.wallet(context).submitDeposit(
-        asset: widget.draft.asset,
+      final trading = TradingScope.maybeOf(context);
+      if (trading == null) {
+        throw WithdrawValidationException('Unable to submit this deposit');
+      }
+      final result = await trading.createDeposit(
         amount: widget.draft.amount,
+        method: widget.draft.asset.withdrawMethodId,
         txid: txid,
       );
       if (!mounted) return;
-      Navigator.of(context).pushReplacementNamed(AppRoutes.liveTransfers);
+      final request = result['request'];
+      await showDialog<void>(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('Deposit request submitted'),
+          content: Text('${result['message'] ?? 'Your request is under review.'}'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('OK'),
+            ),
+          ],
+        ),
+      );
+      if (!mounted) return;
+      if (request is Map) {
+        Navigator.of(context).pushReplacementNamed(
+          AppRoutes.depositDetails,
+          arguments: DepositRequest.fromJson(Map<String, dynamic>.from(request)),
+        );
+      }
+    } on WithdrawValidationException catch (error) {
+      setState(() => _error = error.message);
     } catch (_) {
       setState(() => _error = 'Unable to submit this deposit');
     } finally {
@@ -200,7 +228,7 @@ class _LiveDepositConfirmScreenState extends State<LiveDepositConfirmScreen> {
               ),
               const SizedBox(height: 12),
               Text(
-                'Simulated request only. Live balance stays \$0.00.',
+                'Submitting a request does not credit Live Balance. An administrator must approve it first.',
                 style: TextStyle(color: colors.mutedText, fontSize: 12),
                 textAlign: TextAlign.center,
               ),

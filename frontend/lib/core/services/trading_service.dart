@@ -2,6 +2,7 @@ import 'dart:convert';
 
 import 'package:http/http.dart' as http;
 
+import '../../models/deposit_models.dart';
 import '../../models/trade_models.dart';
 import '../../models/withdraw_models.dart';
 import '../constants/app_constants.dart';
@@ -88,6 +89,59 @@ class TradingService {
       throw Exception('Unable to submit withdrawal');
     }
     return Map<String, dynamic>.from(body);
+  }
+
+  Future<Map<String, dynamic>> createDeposit({
+    required double amount,
+    required String method,
+    required String txid,
+  }) async {
+    final response = await http.post(
+      Uri.parse('$httpBase/api/live/deposits'),
+      headers: await _headers(),
+      body: jsonEncode({
+        'amount': amount,
+        'method': method,
+        'txid': txid,
+      }),
+    );
+    if (response.statusCode == 401) {
+      throw Exception('Session expired. Sign in again.');
+    }
+    final body = jsonDecode(response.body);
+    if (response.statusCode == 400 || response.statusCode == 409) {
+      final detail = body is Map ? body['detail'] : 'Unable to submit deposit';
+      throw WithdrawValidationException('$detail');
+    }
+    if (response.statusCode != 200 || body is! Map) {
+      throw Exception('Unable to submit deposit');
+    }
+    return Map<String, dynamic>.from(body);
+  }
+
+  Future<List<DepositRequest>> listDeposits() async {
+    final response = await http.get(
+      Uri.parse('$httpBase/api/live/deposits'),
+      headers: await _headers(),
+    );
+    if (response.statusCode != 200) return [];
+    final body = jsonDecode(response.body) as Map<String, dynamic>;
+    final rows = body['deposits'] as List<dynamic>? ?? [];
+    return rows
+        .map((row) => DepositRequest.fromJson(Map<String, dynamic>.from(row as Map)))
+        .toList();
+  }
+
+  Future<DepositRequest> getDeposit(String requestId) async {
+    final response = await http.get(
+      Uri.parse('$httpBase/api/live/deposits/$requestId'),
+      headers: await _headers(),
+    );
+    final body = jsonDecode(response.body);
+    if (response.statusCode != 200 || body is! Map || body['request'] is! Map) {
+      throw Exception('Deposit request not found');
+    }
+    return DepositRequest.fromJson(Map<String, dynamic>.from(body['request'] as Map));
   }
 
   Future<List<WithdrawalRequest>> listWithdrawals() async {

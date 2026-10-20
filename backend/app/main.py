@@ -51,7 +51,7 @@ def _trading_engine(admin: AdminMarketControl) -> DemoTradingEngine:
     from app.persistence.firestore_store import build_firestore_stores
 
     init_firebase_admin()
-    accounts, trades, transactions, ledger, withdrawals = build_firestore_stores(
+    accounts, trades, transactions, ledger, withdrawals, deposits = build_firestore_stores(
         admin.trading.initial_balance
     )
     return DemoTradingEngine(
@@ -61,6 +61,7 @@ def _trading_engine(admin: AdminMarketControl) -> DemoTradingEngine:
         transactions=transactions,
         ledger=ledger,
         withdrawals=withdrawals,
+        deposits=deposits,
     )
 
 

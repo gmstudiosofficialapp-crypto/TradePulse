@@ -5,6 +5,7 @@ import '../../core/services/app_scope.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/utils/app_utils.dart';
 import '../../core/utils/validators.dart';
+import '../../models/deposit_models.dart';
 import '../../models/withdraw_models.dart';
 import '../../widgets/brand/asset_icon.dart';
 import '../../widgets/cards/premium_card.dart';
@@ -24,7 +25,9 @@ class AdminPanelScreen extends StatefulWidget {
 class _AdminPanelScreenState extends State<AdminPanelScreen> {
   final _search = TextEditingController();
   String? _status;
+  var _showDeposits = false;
   List<WithdrawalRequest> _items = [];
+  List<DepositRequest> _deposits = [];
   var _loading = true;
   String? _error;
 
@@ -51,6 +54,18 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
     }
     setState(() => _error = null);
     try {
+      if (_showDeposits) {
+        final rows = await admin.listDeposits(
+          status: _status,
+          search: _search.text,
+        );
+        if (!mounted) return;
+        setState(() {
+          _deposits = rows;
+          _loading = false;
+        });
+        return;
+      }
       final rows = await admin.listWithdrawals(
         status: _status,
         search: _search.text,
@@ -148,13 +163,72 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
     }
   }
 
+  Future<void> _approveDeposit(DepositRequest request) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Approve Deposit?'),
+        content: const Text(
+          'Approve this deposit only after you have verified the payment outside TradePulse. Live Balance will be credited once.',
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.of(context).pop(false), child: const Text('Cancel')),
+          FilledButton(onPressed: () => Navigator.of(context).pop(true), child: const Text('Approve')),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+    try {
+      await AppScope.admin(context)?.approveDeposit(request.requestId);
+      if (mounted) await _load();
+    } on AdminAuthException catch (error) {
+      if (!mounted) return;
+      setState(() => _error = error.message);
+    }
+  }
+
+  Future<void> _rejectDeposit(DepositRequest request) async {
+    final reason = TextEditingController();
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Rejection Reason'),
+        content: AppTextField(
+          label: 'Rejection Reason',
+          controller: reason,
+          hintText: 'Transaction reference could not be matched.',
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.of(context).pop(false), child: const Text('Cancel')),
+          FilledButton(onPressed: () => Navigator.of(context).pop(true), child: const Text('Reject Deposit')),
+        ],
+      ),
+    );
+    final text = reason.text;
+    reason.dispose();
+    if (confirmed != true || !mounted) return;
+    if (text.trim().isEmpty) {
+      setState(() => _error = Validators.withdrawRejectionRequired);
+      return;
+    }
+    try {
+      await AppScope.admin(context)?.rejectDeposit(request.requestId, text.trim());
+      if (mounted) await _load();
+    } on AdminAuthException catch (error) {
+      if (!mounted) return;
+      setState(() => _error = error.message);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return AtmosphereBackground(
       child: Scaffold(
         backgroundColor: Colors.transparent,
         resizeToAvoidBottomInset: true,
-        appBar: AppBar(title: const Text('Withdrawals')),
+        appBar: AppBar(
+          title: Text(_showDeposits ? 'Deposits' : 'Withdrawals'),
+        ),
         body: ResponsiveBody(
           maxWidth: 720,
           child: Column(
@@ -163,6 +237,28 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
                 padding: const EdgeInsets.fromLTRB(20, 12, 20, 8),
                 child: Column(
                   children: [
+                    Wrap(
+                      spacing: 8,
+                      children: [
+                        ChoiceChip(
+                          label: const Text('Withdrawal requests'),
+                          selected: !_showDeposits,
+                          onSelected: (_) {
+                            setState(() => _showDeposits = false);
+                            _load();
+                          },
+                        ),
+                        ChoiceChip(
+                          label: const Text('Deposit requests'),
+                          selected: _showDeposits,
+                          onSelected: (_) {
+                            setState(() => _showDeposits = true);
+                            _load();
+                          },
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 10),
                     AppTextField(
                       label: 'Search',
                       controller: _search,
@@ -208,19 +304,38 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
                     ? const Center(child: CircularProgressIndicator())
                     : RefreshIndicator(
                         onRefresh: _load,
-                        child: _items.isEmpty
+                        child: (_showDeposits ? _deposits.isEmpty : _items.isEmpty)
                             ? ListView(
                                 physics: const AlwaysScrollableScrollPhysics(),
-                                children: const [
-                                  SizedBox(height: 48),
+                                children: [
+                                  const SizedBox(height: 48),
                                   EmptyState(
-                                    title: 'No withdrawals',
-                                    message:
-                                        'Withdrawal requests will appear here.',
+                                    title: _showDeposits ? 'No deposits' : 'No withdrawals',
+                                    message: _showDeposits
+                                        ? 'Deposit requests will appear here.'
+                                        : 'Withdrawal requests will appear here.',
                                     icon: Icons.account_balance_wallet_outlined,
                                   ),
                                 ],
                               )
+                            : _showDeposits
+                                ? ListView.separated(
+                                    padding: const EdgeInsets.fromLTRB(20, 8, 20, 28),
+                                    itemCount: _deposits.length,
+                                    separatorBuilder: (_, _) => const SizedBox(height: 10),
+                                    itemBuilder: (context, index) {
+                                      final item = _deposits[index];
+                                      return _DepositAdminTile(
+                                        request: item,
+                                        onApprove: item.status == WithdrawStatus.pending
+                                            ? () => _approveDeposit(item)
+                                            : null,
+                                        onReject: item.status == WithdrawStatus.pending
+                                            ? () => _rejectDeposit(item)
+                                            : null,
+                                      );
+                                    },
+                                  )
                             : ListView.separated(
                                 padding: const EdgeInsets.fromLTRB(20, 8, 20, 28),
                                 itemCount: _items.length,
@@ -325,6 +440,76 @@ class _AdminTile extends StatelessWidget {
                     style: OutlinedButton.styleFrom(
                       minimumSize: const Size(0, 48),
                     ),
+                    onPressed: onReject,
+                    child: const Text('Reject'),
+                  ),
+              ],
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _DepositAdminTile extends StatelessWidget {
+  const _DepositAdminTile({
+    required this.request,
+    required this.onApprove,
+    required this.onReject,
+  });
+
+  final DepositRequest request;
+  final VoidCallback? onApprove;
+  final VoidCallback? onReject;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.tpColors;
+    return PremiumCard(
+      padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              AssetIcon(symbol: request.method.iconSymbol, size: 36),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  request.requestId,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(fontWeight: FontWeight.w800),
+                ),
+              ),
+              Text(request.status.label),
+            ],
+          ),
+          const SizedBox(height: 10),
+          Text(request.accountLabel.isEmpty ? request.userId ?? '' : request.accountLabel),
+          Text('${AppUtils.formatMoney(request.amountUsd)} USD'),
+          Text('${request.method.title} · ${request.network}'),
+          Text(request.txid, maxLines: 2, overflow: TextOverflow.ellipsis),
+          if (request.createdStamp != null)
+            Text(
+              AppUtils.formatDetailStamp(request.createdStamp!),
+              style: TextStyle(color: colors.mutedText, fontSize: 12),
+            ),
+          if (onApprove != null || onReject != null) ...[
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                if (onApprove != null)
+                  FilledButton(
+                    style: FilledButton.styleFrom(minimumSize: const Size(0, 48)),
+                    onPressed: onApprove,
+                    child: const Text('Approve'),
+                  ),
+                const SizedBox(width: 8),
+                if (onReject != null)
+                  OutlinedButton(
+                    style: OutlinedButton.styleFrom(minimumSize: const Size(0, 48)),
                     onPressed: onReject,
                     child: const Text('Reject'),
                   ),

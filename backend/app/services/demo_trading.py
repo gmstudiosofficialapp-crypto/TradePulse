@@ -10,6 +10,7 @@ from app.persistence.memory import (
     MemoryLedger,
     MemoryTradeStore,
     MemoryTransactionStore,
+    MemoryDepositStore,
     MemoryWithdrawalStore,
 )
 
@@ -83,6 +84,7 @@ class DemoTradingEngine:
         transactions: MemoryTransactionStore | None = None,
         ledger=None,
         withdrawals=None,
+        deposits=None,
     ) -> None:
         self.settings = settings or TradingSettings()
         self.accounts = accounts or MemoryAccountStore(self.settings.initial_balance)
@@ -93,6 +95,10 @@ class DemoTradingEngine:
         bind = getattr(self.withdrawals, "bind_accounts", None)
         if bind is not None:
             bind(self.accounts)
+        self.deposits = deposits or MemoryDepositStore(self.accounts)
+        bind_deposits = getattr(self.deposits, "bind_accounts", None)
+        if bind_deposits is not None:
+            bind_deposits(self.accounts)
         self._hot_open: dict[str, dict] = {}
         self._hot_ready = False
         self._overlay: dict[str, dict] = {}

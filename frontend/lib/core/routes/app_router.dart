@@ -14,6 +14,9 @@ import '../../screens/profile/profile_screen.dart';
 import '../../screens/settings/settings_screen.dart';
 import '../../screens/splash_screen.dart';
 import '../../screens/trade/trade_screen.dart';
+import '../../models/deposit_models.dart';
+import '../../screens/wallet/deposit_details_screen.dart';
+import '../../screens/wallet/deposit_history_screen.dart';
 import '../../screens/wallet/live_deposit_confirm_screen.dart';
 import '../../screens/wallet/live_deposit_screen.dart';
 import '../../screens/wallet/live_transfers_screen.dart';
@@ -93,6 +96,15 @@ class AppRouter {
           : const LiveDepositScreen(),
       AppRoutes.liveWithdraw => const LiveWithdrawScreen(),
       AppRoutes.liveTransfers => const LiveTransfersScreen(),
+      AppRoutes.depositHistory => const DepositHistoryScreen(),
+      AppRoutes.depositDetails => DepositDetailsScreen(
+          requestId: arguments is DepositRequest
+              ? arguments.requestId
+              : arguments is String
+                  ? arguments
+                  : '',
+          initial: arguments is DepositRequest ? arguments : null,
+        ),
       AppRoutes.withdrawalHistory => const WithdrawalHistoryScreen(),
       AppRoutes.withdrawalDetails => WithdrawalDetailsScreen(
           requestId: _withdrawalRequestId(arguments),

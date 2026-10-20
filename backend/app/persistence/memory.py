@@ -237,6 +237,104 @@ class MemoryWithdrawalStore:
             return dict(row), live
 
 
+class MemoryDepositStore:
+    def __init__(self, accounts: MemoryAccountStore | None = None) -> None:
+        self.accounts = accounts
+        self._items: dict[str, dict] = {}
+        self._lock = Lock()
+
+    def bind_accounts(self, accounts: MemoryAccountStore) -> None:
+        self.accounts = accounts
+
+    def get(self, request_id: str) -> dict | None:
+        row = self._items.get(request_id)
+        return dict(row) if row is not None else None
+
+    def list_for_user(self, user_id: str) -> list[dict]:
+        rows = [dict(item) for item in self._items.values() if item.get("user_id") == user_id]
+        return sorted(rows, key=lambda item: item.get("created_at", ""), reverse=True)
+
+    def list_all(self) -> list[dict]:
+        rows = [dict(item) for item in self._items.values()]
+        return sorted(rows, key=lambda item: item.get("created_at", ""), reverse=True)
+
+    def create_pending(self, row: dict) -> dict:
+        if self.accounts is None:
+            raise RuntimeError("Deposit account store is unavailable")
+        with self._lock:
+            stored = dict(row)
+            stored["credited"] = False
+            self._items[stored["request_id"]] = stored
+            return dict(stored)
+
+    def approve(self, request_id: str, admin_username: str) -> tuple[dict, float]:
+        from app.services.deposit import (
+            MSG_ALREADY_REJECTED,
+            MSG_NOT_FOUND,
+            STATUS_PENDING,
+            STATUS_REJECTED,
+            STATUS_SUCCESSFUL,
+            DepositError,
+        )
+
+        if self.accounts is None:
+            raise RuntimeError("Deposit account store is unavailable")
+        with self._lock:
+            row = self._items.get(request_id)
+            if row is None:
+                raise DepositError(MSG_NOT_FOUND, "not_found")
+            user_id = row["user_id"]
+            live = self.accounts.get_live_balance(user_id)
+            if row.get("status") == STATUS_SUCCESSFUL:
+                return dict(row), live
+            if row.get("status") == STATUS_REJECTED:
+                raise DepositError(MSG_ALREADY_REJECTED, "conflict")
+            if row.get("status") != STATUS_PENDING:
+                raise DepositError(MSG_ALREADY_REJECTED, "conflict")
+            if not row.get("credited"):
+                live = round(live + float(row["amount_usd"]), 2)
+                self.accounts.set_live_balance(user_id, live)
+                row["credited"] = True
+            now = datetime.now(timezone.utc).isoformat()
+            row["status"] = STATUS_SUCCESSFUL
+            row["updated_at"] = now
+            row["processed_at"] = now
+            row["processed_by"] = admin_username
+            return dict(row), live
+
+    def reject(self, request_id: str, admin_username: str, reason: str) -> tuple[dict, float]:
+        from app.services.deposit import (
+            MSG_ALREADY_SUCCESSFUL,
+            MSG_NOT_FOUND,
+            STATUS_PENDING,
+            STATUS_REJECTED,
+            STATUS_SUCCESSFUL,
+            DepositError,
+        )
+
+        if self.accounts is None:
+            raise RuntimeError("Deposit account store is unavailable")
+        with self._lock:
+            row = self._items.get(request_id)
+            if row is None:
+                raise DepositError(MSG_NOT_FOUND, "not_found")
+            live = self.accounts.get_live_balance(row["user_id"])
+            if row.get("status") == STATUS_REJECTED:
+                return dict(row), live
+            if row.get("status") == STATUS_SUCCESSFUL or row.get("credited"):
+                raise DepositError(MSG_ALREADY_SUCCESSFUL, "conflict")
+            if row.get("status") != STATUS_PENDING:
+                raise DepositError(MSG_ALREADY_SUCCESSFUL, "conflict")
+            now = datetime.now(timezone.utc).isoformat()
+            row["status"] = STATUS_REJECTED
+            row["rejection_reason"] = reason
+            row["credited"] = False
+            row["updated_at"] = now
+            row["processed_at"] = now
+            row["processed_by"] = admin_username
+            return dict(row), live
+
+
 class MemorySignalStore:
     def __init__(self) -> None:
         self._items: list[dict] = []

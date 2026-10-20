@@ -15,6 +15,8 @@ class AppRoutes {
   static const String changePassword = '/change-password';
   static const String liveDeposit = '/live-deposit';
   static const String liveDepositConfirm = '/live-deposit-confirm';
+  static const String depositHistory = '/deposit-history';
+  static const String depositDetails = '/deposit-details';
   static const String liveWithdraw = '/live-withdraw';
   static const String liveTransfers = '/live-transfers';
   static const String withdrawalHistory = '/withdrawal-history';

@@ -162,11 +162,11 @@ class Validators {
     if (parsed == null) {
       return 'Enter a valid amount';
     }
-    if (parsed < 50) {
-      return 'Minimum deposit is \$50.';
+    if (parsed < 100) {
+      return 'Minimum deposit is \$100.00.';
     }
-    if (parsed > 5000) {
-      return 'Maximum deposit is \$5,000.';
+    if (parsed > 10000) {
+      return 'Maximum deposit is \$10,000.00.';
     }
     return null;
   }

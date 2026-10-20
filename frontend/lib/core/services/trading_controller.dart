@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 
 import '../../core/constants/app_constants.dart';
 import '../../core/constants/otc_assets.dart';
+import '../../models/deposit_models.dart';
 import '../../models/trade_models.dart';
 import '../../models/withdraw_models.dart';
 import 'trading_service.dart';
@@ -105,6 +106,19 @@ class TradingController extends ChangeNotifier {
     }
     return result;
   }
+
+  Future<Map<String, dynamic>> createDeposit({
+    required double amount,
+    required String method,
+    required String txid,
+  }) {
+    return _service.createDeposit(amount: amount, method: method, txid: txid);
+  }
+
+  Future<List<DepositRequest>> listDeposits() => _service.listDeposits();
+
+  Future<DepositRequest> getDeposit(String requestId) =>
+      _service.getDeposit(requestId);
 
   Future<List<WithdrawalRequest>> listWithdrawals() =>
       _service.listWithdrawals();
