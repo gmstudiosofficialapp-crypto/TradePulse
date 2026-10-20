@@ -63,6 +63,44 @@ class OtcAssets {
   static String payoutLabel(String symbol) =>
       '${(payoutRate(symbol) * 100).round()}%';
 
+  static int pricePrecision(String symbol) {
+    return switch (symbol) {
+      'XRP/USD-OTC' => 4,
+      'DOGE/USD-OTC' => 5,
+      'EUR/USD-OTC' ||
+      'GBP/USD-OTC' ||
+      'AUD/USD-OTC' ||
+      'USD/CAD-OTC' ||
+      'USD/CHF-OTC' ||
+      'EUR/GBP-OTC' =>
+        5,
+      'USD/JPY-OTC' ||
+      'EUR/JPY-OTC' ||
+      'GBP/JPY-OTC' ||
+      'AUD/JPY-OTC' ||
+      'SILVER/USD-OTC' =>
+        3,
+      _ => 2,
+    };
+  }
+
+  static String quoteCurrency(String symbol) {
+    return switch (symbol) {
+      'USD/JPY-OTC' || 'EUR/JPY-OTC' || 'GBP/JPY-OTC' || 'AUD/JPY-OTC' => 'JPY',
+      'USD/CAD-OTC' => 'CAD',
+      'USD/CHF-OTC' => 'CHF',
+      'EUR/GBP-OTC' => 'GBP',
+      _ => 'USD',
+    };
+  }
+
+  static String formatAssetPrice(String symbol, double price) {
+    final text = price.toStringAsFixed(pricePrecision(symbol));
+    final quote = quoteCurrency(symbol);
+    if (quote == 'USD') return '\$$text';
+    return '$text $quote';
+  }
+
   static String categoryLabel(AssetCategory category) {
     return switch (category) {
       AssetCategory.crypto => 'CRYPTO',

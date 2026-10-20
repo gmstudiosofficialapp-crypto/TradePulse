@@ -21,6 +21,7 @@ from market_engine.services.tick_engine import TickEngine
 from market_engine.services.reference_prices import (
     collect_reference_prices,
     is_valid_price,
+    quote_currency,
     reference_fetch_enabled,
 )
 
@@ -81,11 +82,15 @@ class MarketRuntime:
             return None
         open_px = self.session_open.get(symbol, tick.price)
         change_pct = 0.0 if open_px == 0 else ((tick.price - open_px) / open_px) * 100
+        stream = self.streams.get(symbol)
+        precision = stream.config.precision if stream is not None else 2
         return {
             "asset": symbol,
             "price": tick.price,
             "timestamp": tick.timestamp.isoformat(),
             "change_pct": round(change_pct, 4),
+            "precision": precision,
+            "quote_currency": quote_currency(symbol),
             "candle": candle.to_dict() if candle else None,
             "simulated": True,
             "price_basis": "otc_simulated",

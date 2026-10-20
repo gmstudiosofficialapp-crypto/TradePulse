@@ -95,7 +95,7 @@ class AssetCard extends StatelessWidget {
                 child: Text(
                   quote == null
                       ? AppConstants.priceUnavailable
-                      : '\$${AppUtils.formatPrice(quote.price)}',
+                      : OtcAssets.formatAssetPrice(asset.symbol, quote.price),
                   style: Theme.of(context).textTheme.titleMedium,
                 ),
               ),

@@ -73,6 +73,18 @@ def test_signal_expiry_settlement() -> None:
     assert again.status == "CLOSED"
 
 
+def test_buy_loss_and_sell_win_use_entry_versus_expiry() -> None:
+    buy = SignalEngine(strategy=ForcedStrategy("BUY"))
+    buy_candles = trend_candles("BTC/USD-OTC", 81419, 1)
+    buy_signal = buy.analyze_closed("BTC/USD-OTC", buy_candles)
+    lost = buy.settle(buy_signal.signal_id, buy_signal.entry_price - 12.5)
+    assert lost.result == "LOSS"
+    sell = SignalEngine(strategy=ForcedStrategy("SELL"))
+    sell_signal = sell.analyze_closed("ETH/USD-OTC", trend_candles("ETH/USD-OTC", 2383, -1))
+    won = sell.settle(sell_signal.signal_id, sell_signal.entry_price - 4)
+    assert won.result == "WIN"
+
+
 def test_ten_independent_active_signals_and_capacity() -> None:
     engine = SignalEngine(strategy=ForcedStrategy("BUY"))
     created = []
