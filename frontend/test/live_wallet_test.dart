@@ -211,8 +211,8 @@ void main() {
   });
 
   test('live deposit amount bounds', () {
-    expect(Validators.liveDepositAmount('99.99'), 'Minimum deposit is \$100.00.');
-    expect(Validators.liveDepositAmount('100'), isNull);
+    expect(Validators.liveDepositAmount('9.99'), 'Minimum deposit is \$10.00.');
+    expect(Validators.liveDepositAmount('10'), isNull);
     expect(Validators.liveDepositAmount('10000'), isNull);
     expect(Validators.liveDepositAmount('10000.01'), 'Maximum deposit is \$10,000.00.');
   });
@@ -461,11 +461,11 @@ void main() {
       find.byType(ListView).first,
       const Offset(0, -120),
     );
-    await tester.enterText(find.widgetWithText(TextFormField, 'Custom amount'), '99.99');
+    await tester.enterText(find.widgetWithText(TextFormField, 'Custom amount'), '9.99');
     await tester.ensureVisible(find.widgetWithText(FilledButton, 'Continue'));
     await tester.tap(find.widgetWithText(FilledButton, 'Continue'));
     await tester.pump();
-    expect(find.text('Minimum deposit is \$100.00.'), findsOneWidget);
+    expect(find.text('Minimum deposit is \$10.00.'), findsOneWidget);
 
     await tester.enterText(find.widgetWithText(TextFormField, 'Custom amount'), '10000.01');
     await tester.tap(find.widgetWithText(FilledButton, 'Continue'));

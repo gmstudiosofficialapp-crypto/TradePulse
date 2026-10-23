@@ -29964,7 +29964,7 @@ case 4:s="Enter your Nagad number"
 break
 default:s=null}return s},
 b57(a){var s,r,q=B.c.bi(a).toLowerCase()
-for(s=0;s<5;++s){r=B.NT[s]
+for(s=0;s<5;++s){r=B.NU[s]
 if(A.aSZ(r)===q)return r}return null},
 aT0(a){var s
 switch(a.a){case 0:s="Pending"
@@ -31800,7 +31800,7 @@ if(a==null||B.c.bi(a).length===0)return"Enter a deposit amount"
 s=A.dA(a,",","")
 r=A.Sr(B.c.bi(A.dA(s,"$","")))
 if(r==null)return"Enter a valid amount"
-if(r<100)return"Minimum deposit is $100.00."
+if(r<10)return"Minimum deposit is $10.00."
 if(r>1e4)return"Maximum deposit is $10,000.00."
 return null},
 aM1(a,b){if(a==null||a.length===0)return"Confirm your password"
@@ -49353,7 +49353,7 @@ r=A.oX(B.RY,B.h,r==null?1:r)
 r.toString
 q=p.ad(q.gp())
 if(q==null)q=1
-return A.aLW(A.aRJ(null,B.n,new A.wC(q,B.O8,new A.cv(B.Ew,this.e)),s,1,B.WR),r)}}
+return A.aLW(A.aRJ(null,B.n,new A.wC(q,B.O9,new A.cv(B.Ew,this.e)),s,1,B.WR),r)}}
 A.Mj.prototype={
 l(){var s=this,r=s.bl$
 if(r!=null)r.J(s.gfo())
@@ -54969,7 +54969,7 @@ A.aCJ.prototype={
 $2(a,b){return this.a.D$.c9(a,this.b)},
 $S:11}
 A.WX.prototype={
-gGq(){return B.NS},
+gGq(){return B.NT},
 KW(a){var s
 switch(a.a){case 0:s=this.d.b
 break
@@ -59259,7 +59259,7 @@ A.aCY.prototype={
 $0(){return A.b([],t.q1)},
 $S:269}
 A.XN.prototype={
-gGq(){return B.NZ},
+gGq(){return B.O_},
 KW(a){var s,r=this
 switch(a.a){case 0:s=r.d.at
 break
@@ -102628,7 +102628,7 @@ A.azW.prototype={
 $0(){return this.a.e=!1},
 $S:0}
 A.Dp.prototype={
-a4(){return new A.Ji(new A.b6(null,t.am),new A.c7(new A.cp("100",B.cg,B.aP),$.a7()),B.mb)}}
+a4(){return new A.Ji(new A.b6(null,t.am),new A.c7(new A.cp("10",B.cg,B.aP),$.a7()),B.mb)}}
 A.Ji.prototype={
 l(){var s=this.e
 s.N$=$.a7()
@@ -102653,13 +102653,13 @@ r=A.v(a).ok.w
 g=A.b([g,B.ai,new A.cg(s,B.T,l,!1,!1,l),B.bD,A.P("Payment method",l,l,l,l,r==null?l:r.wK(j,B.X),l,l,l),B.ae],i)
 for(p=0;p<3;++p){o=B.rk[p]
 B.b.O(g,A.b([new A.Wp(o,m.f===o,new A.aA0(m,o),l),B.al],i))}g.push(B.D)
-g.push(A.P("Minimum deposit $100.00  \xb7  Maximum deposit $10,000.00",l,l,l,l,A.bh(l,l,k.ax,l,l,l,l,l,l,l,l,l,l,l,B.a_,l,l,!0,l,l,l,l,l,l,l,l),l,l,l))
+g.push(A.P("Minimum deposit $10.00  \xb7  Maximum deposit $10,000.00",l,l,l,l,A.bh(l,l,k.ax,l,l,l,l,l,l,l,l,l,l,l,B.a_,l,l,!0,l,l,l,l,l,l,l,l),l,l,l))
 g.push(B.D)
 s=A.v(a).ok.w
 g.push(A.P("Amount",l,l,l,l,s==null?l:s.wK(j,B.X),l,l,l))
 g.push(B.al)
 i=A.b([],i)
-for(s=m.e,p=0;p<7;++p){n=B.O9[p]
+for(s=m.e,p=0;p<8;++p){n=B.NR[p]
 r=A.cU(n)
 r=A.P(A.dA(r,".00",""),l,l,l,l,l,l,l,l)
 q=s.a.a
@@ -108880,18 +108880,18 @@ B.hn=new A.nm(3,"justify")
 B.ax=new A.nm(4,"start")
 B.ho=new A.nm(5,"end")
 B.NI=s([B.e5,B.e6,B.b1,B.hn,B.ax,B.ho],A.al("H<nm>"))
-B.NX=s([2,1.13276676],t.n)
+B.NY=s([2,1.13276676],t.n)
 B.MX=s([2.18349805,1.20311921],t.n)
 B.ON=s([2.33888662,1.28698796],t.n)
 B.OS=s([2.48660575,1.36351941],t.n)
 B.NN=s([2.62226596,1.44717976],t.n)
 B.NQ=s([2.7514899,1.53385819],t.n)
 B.Oj=s([3.36298265,1.98288283],t.n)
-B.O_=s([4.08649929,2.23811846],t.n)
+B.O0=s([4.08649929,2.23811846],t.n)
 B.Ob=s([4.85481134,2.47563463],t.n)
 B.NO=s([5.62945551,2.72948597],t.n)
-B.NY=s([6.43023796,2.98020421],t.n)
-B.r8=s([B.NX,B.MX,B.ON,B.OS,B.NN,B.NQ,B.Oj,B.O_,B.Ob,B.NO,B.NY],t.zg)
+B.NZ=s([6.43023796,2.98020421],t.n)
+B.r8=s([B.NY,B.MX,B.ON,B.OS,B.NN,B.NQ,B.Oj,B.O0,B.Ob,B.NO,B.NZ],t.zg)
 B.NK=s(["ALL","WIN","LOSS","DRAW"],t.s)
 B.NM=s([B.kp,B.kq],A.al("H<AH>"))
 B.Lq=new A.bl(61345,"MaterialIcons",!1)
@@ -108908,13 +108908,14 @@ B.Ll=new A.bl(58513,"MaterialIcons",!1)
 B.VG=new A.ly("/profile","Profile",B.Lm,B.Ll)
 B.iQ=s([B.VI,B.VH,B.VF,B.VJ,B.VG],A.al("H<ly>"))
 B.r9=s(["Monday","Tuesday","Wednesday","Thursday","Friday","Saturday","Sunday"],t.s)
+B.NR=s([10,100,250,500,1000,2500,5000,1e4],t.n)
 B.bI=new A.lN(0,"label")
 B.bj=new A.lN(1,"avatar")
 B.cy=new A.lN(2,"deleteIcon")
-B.NS=s([B.bI,B.bj,B.cy],A.al("H<lN>"))
+B.NT=s([B.bI,B.bj,B.cy],A.al("H<lN>"))
 B.jV=new A.pI(3,"bkash")
 B.jW=new A.pI(4,"nagad")
-B.NT=s([B.hx,B.jT,B.jU,B.jV,B.jW],t.iU)
+B.NU=s([B.hx,B.jT,B.jU,B.jV,B.jW],t.iU)
 B.b5=new A.fj(0,"icon")
 B.bk=new A.fj(1,"input")
 B.aA=new A.fj(2,"label")
@@ -108926,7 +108927,7 @@ B.bd=new A.fj(7,"suffixIcon")
 B.ch=new A.fj(8,"helperError")
 B.ci=new A.fj(9,"counter")
 B.dn=new A.fj(10,"container")
-B.NZ=s([B.b5,B.bk,B.aA,B.bs,B.bt,B.bu,B.ay,B.bd,B.ch,B.ci,B.dn],A.al("H<fj>"))
+B.O_=s([B.b5,B.bk,B.aA,B.bs,B.bt,B.bu,B.ay,B.bd,B.ch,B.ci,B.dn],A.al("H<fj>"))
 B.Pl=new A.rB("en",null,"US")
 B.ra=s([B.Pl],t.ss)
 B.a4p=new A.nC(0,0)
@@ -108936,13 +108937,12 @@ B.a4t=new A.nC(6,0.11)
 B.a4r=new A.nC(8,0.12)
 B.a4q=new A.nC(12,0.14)
 B.rb=s([B.a4p,B.a4u,B.a4s,B.a4t,B.a4r,B.a4q],A.al("H<nC>"))
-B.O6=s([-1,0,0,1,0,0,-1,0,1,0,0,0,-1,1,0,1,1,1,1,0],t.n)
+B.O7=s([-1,0,0,1,0,0,-1,0,1,0,0,0,-1,1,0,1,1,1,1,0],t.n)
 B.Eu=new A.O_(2,"outer")
 B.p5=new A.B(0.09803921568627451,0,0,0,B.f)
 B.h=new A.h(0,0)
 B.F5=new A.bo(0.2,B.Eu,B.p5,B.h,11)
-B.O8=s([B.F5],t.V)
-B.O9=s([100,250,500,1000,2500,5000,1e4],t.n)
+B.O9=s([B.F5],t.V)
 B.CC=new A.Gs(0,"left")
 B.CD=new A.Gs(1,"right")
 B.Oa=s([B.CC,B.CD],A.al("H<Gs>"))
@@ -109185,19 +109185,19 @@ B.Fa=new A.bo(-4,B.Q,B.cm,B.RZ,8)
 B.RU=new A.h(0,12)
 B.F6=new A.bo(2,B.Q,B.cn,B.RU,17)
 B.Fk=new A.bo(4,B.Q,B.c5,B.mD,22)
-B.NW=s([B.Fa,B.F6,B.Fk],t.V)
+B.NX=s([B.Fa,B.F6,B.Fk],t.V)
 B.Fj=new A.bo(-5,B.Q,B.cm,B.dV,10)
 B.RV=new A.h(0,16)
 B.Fc=new A.bo(2,B.Q,B.cn,B.RV,24)
 B.Fp=new A.bo(5,B.Q,B.c5,B.xy,30)
-B.NV=s([B.Fj,B.Fc,B.Fp],t.V)
+B.NW=s([B.Fj,B.Fc,B.Fp],t.V)
 B.RT=new A.h(0,11)
 B.EZ=new A.bo(-7,B.Q,B.cm,B.RT,15)
 B.RX=new A.h(0,24)
 B.Fi=new A.bo(3,B.Q,B.cn,B.RX,38)
 B.Fb=new A.bo(8,B.Q,B.c5,B.xz,46)
-B.O7=s([B.EZ,B.Fi,B.Fb],t.V)
-B.QP=new A.de([0,B.m7,1,B.P1,2,B.NJ,3,B.OV,4,B.MW,6,B.NP,8,B.Nh,9,B.Nw,12,B.NW,16,B.NV,24,B.O7],A.al("de<m,V<bo>>"))
+B.O8=s([B.EZ,B.Fi,B.Fb],t.V)
+B.QP=new A.de([0,B.m7,1,B.P1,2,B.NJ,3,B.OV,4,B.MW,6,B.NP,8,B.Nh,9,B.Nw,12,B.NX,16,B.NW,24,B.O8],A.al("de<m,V<bo>>"))
 B.cr=new A.i(4294968065)
 B.n7=new A.ak(B.cr,!1,!1,!0,!1,B.u)
 B.c7=new A.i(4294968066)
@@ -109752,7 +109752,7 @@ B.Og=s([8589934850,8589934850,8589934851,null],t.Z)
 B.xp=new A.de(["*",B.Na,"+",B.Nb,"-",B.Nc,".",B.Nd,"/",B.Ne,"0",B.Nf,"1",B.Ng,"2",B.Nj,"3",B.Nl,"4",B.Nm,"5",B.Nn,"6",B.No,"7",B.Np,"8",B.Nq,"9",B.Ns,"Alt",B.Od,"AltGraph",B.N_,"ArrowDown",B.N0,"ArrowLeft",B.N1,"ArrowRight",B.N2,"ArrowUp",B.N3,"Clear",B.N8,"Control",B.Oe,"Delete",B.MZ,"End",B.N4,"Enter",B.MY,"Home",B.N5,"Insert",B.N9,"Meta",B.Of,"PageDown",B.N6,"PageUp",B.N7,"Shift",B.Og],A.al("de<n,V<m?>>"))
 B.Nr=s([B.ru,null,null,B.xa],t.L)
 B.OL=s([B.wX,null,null,B.xb],t.L)
-B.NU=s([B.wY,null,null,B.xc],t.L)
+B.NV=s([B.wY,null,null,B.xc],t.L)
 B.Oh=s([B.wZ,null,null,B.dP],t.L)
 B.MQ=s([B.x_,null,null,B.xd],t.L)
 B.P6=s([B.x0,null,null,B.mn],t.L)
@@ -109767,22 +109767,22 @@ B.OM=s([B.x8,null,null,B.dT],t.L)
 B.OP=s([B.x9,null,null,B.h0],t.L)
 B.NB=s([B.fW,B.fW,B.iY,null],t.L)
 B.P7=s([B.iU,null,B.iU,null],t.L)
-B.O0=s([B.cr,null,null,B.dQ],t.L)
-B.O1=s([B.c7,null,null,B.dR],t.L)
-B.O2=s([B.c8,null,null,B.dS],t.L)
+B.O1=s([B.cr,null,null,B.dQ],t.L)
+B.O2=s([B.c7,null,null,B.dR],t.L)
+B.O3=s([B.c8,null,null,B.dS],t.L)
 B.P9=s([B.cs,null,null,B.dT],t.L)
 B.OW=s([B.mg,null,null,B.mo],t.L)
 B.NC=s([B.fV,B.fV,B.iX,null],t.L)
 B.Oq=s([B.b8,null,null,B.dP],t.L)
-B.O3=s([B.dM,null,null,B.fY],t.L)
+B.O4=s([B.dM,null,null,B.fY],t.L)
 B.Nu=s([B.iT,null,null,B.mm],t.L)
-B.O4=s([B.dN,null,null,B.h_],t.L)
+B.O5=s([B.dN,null,null,B.h_],t.L)
 B.OX=s([B.mh,null,null,B.mn],t.L)
 B.ND=s([B.fX,B.fX,B.iZ,null],t.L)
-B.O5=s([B.fT,null,null,B.fZ],t.L)
+B.O6=s([B.fT,null,null,B.fZ],t.L)
 B.Ou=s([B.fU,null,null,B.h0],t.L)
 B.NE=s([B.db,B.db,B.dO,null],t.L)
-B.R6=new A.de(["*",B.Nr,"+",B.OL,"-",B.NU,".",B.Oh,"/",B.MQ,"0",B.P6,"1",B.P_,"2",B.Nz,"3",B.Pa,"4",B.OY,"5",B.Nv,"6",B.MV,"7",B.NL,"8",B.OM,"9",B.OP,"Alt",B.NB,"AltGraph",B.P7,"ArrowDown",B.O0,"ArrowLeft",B.O1,"ArrowRight",B.O2,"ArrowUp",B.P9,"Clear",B.OW,"Control",B.NC,"Delete",B.Oq,"End",B.O3,"Enter",B.Nu,"Home",B.O4,"Insert",B.OX,"Meta",B.ND,"PageDown",B.O5,"PageUp",B.Ou,"Shift",B.NE],A.al("de<n,V<i?>>"))
+B.R6=new A.de(["*",B.Nr,"+",B.OL,"-",B.NV,".",B.Oh,"/",B.MQ,"0",B.P6,"1",B.P_,"2",B.Nz,"3",B.Pa,"4",B.OY,"5",B.Nv,"6",B.MV,"7",B.NL,"8",B.OM,"9",B.OP,"Alt",B.NB,"AltGraph",B.P7,"ArrowDown",B.O1,"ArrowLeft",B.O2,"ArrowRight",B.O3,"ArrowUp",B.P9,"Clear",B.OW,"Control",B.NC,"Delete",B.Oq,"End",B.O4,"Enter",B.Nu,"Home",B.O5,"Insert",B.OX,"Meta",B.ND,"PageDown",B.O6,"PageUp",B.Ou,"Shift",B.NE],A.al("de<n,V<i?>>"))
 B.RJ={KeyA:0,KeyB:1,KeyC:2,KeyD:3,KeyE:4,KeyF:5,KeyG:6,KeyH:7,KeyI:8,KeyJ:9,KeyK:10,KeyL:11,KeyM:12,KeyN:13,KeyO:14,KeyP:15,KeyQ:16,KeyR:17,KeyS:18,KeyT:19,KeyU:20,KeyV:21,KeyW:22,KeyX:23,KeyY:24,KeyZ:25,Digit1:26,Digit2:27,Digit3:28,Digit4:29,Digit5:30,Digit6:31,Digit7:32,Digit8:33,Digit9:34,Digit0:35,Minus:36,Equal:37,BracketLeft:38,BracketRight:39,Backslash:40,Semicolon:41,Quote:42,Backquote:43,Comma:44,Period:45,Slash:46}
 B.xq=new A.bV(B.RJ,["a","b","c","d","e","f","g","h","i","j","k","l","m","n","o","p","q","r","s","t","u","v","w","x","y","z","1","2","3","4","5","6","7","8","9","0","-","=","[","]","\\",";","'","`",",",".","/"],t.li)
 B.R9=new A.de([B.hv,-7,B.f0,1,B.jK,7,B.e8,-1],A.al("de<nr,m>"))
@@ -110690,8 +110690,8 @@ B.CY=new A.u(!1,null,null,null,null,null,14,B.z,null,-0.15,null,null,null,null,n
 B.a_T=new A.u(!0,null,null,null,null,null,15,B.a_,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null)
 B.a_U=new A.u(!0,null,null,null,null,null,15,B.X,null,null,null,null,1.2,null,null,null,null,null,null,null,null,null,null,null,null,null)
 B.FP=new A.Cw()
-B.NR=s([B.FP],A.al("H<Cw>"))
-B.a0B=new A.u(!0,null,null,null,null,null,16,B.a_,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,B.NR,null,null)
+B.NS=s([B.FP],A.al("H<Cw>"))
+B.a0B=new A.u(!0,null,null,null,null,null,16,B.a_,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,B.NS,null,null)
 B.a0I=new A.u(!0,null,null,null,null,null,15,B.X,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null)
 B.a0K=new A.u(!0,B.m,null,null,null,null,8,B.a_,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null)
 B.a0R=new A.u(!0,B.m,null,null,null,null,12,B.a_,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null)
@@ -111559,7 +111559,7 @@ return A.b([A.O(A.O(A.aw(),q),"Baseline"),A.O(A.O(A.aw(),q),"AboveBaseline"),A.O
 r($,"bfm","aYu",()=>A.dK().ga06()+"roboto/v32/KFOmCnqEu92Fr1Me4GZLCzYlKw.woff2")
 r($,"beK","aY2",()=>A.b6G(A.zP(A.zP(A.m_(),"window"),"FinalizationRegistry"),A.dY(new A.aI3())))
 r($,"bg6","aYU",()=>new A.ajj())
-s($,"beQ","aY5",()=>A.b2a(B.O6))
+s($,"beQ","aY5",()=>A.b2a(B.O7))
 s($,"beP","aJG",()=>A.afC(A.b__($.aY5())))
 s($,"bbt","dZ",()=>{var q,p=A.O(A.O(A.m_(),"window"),"screen")
 p=p==null?null:A.O(p,"width")

@@ -7,7 +7,7 @@ from typing import Any
 
 from app.core.runtime import get_trading
 
-MIN_DEPOSIT = 100.0
+MIN_DEPOSIT = 10.0
 MAX_DEPOSIT = 10_000.0
 
 STATUS_PENDING = "Pending"
@@ -19,7 +19,7 @@ METHOD_USDT_TRC20 = "usdt_trc20"
 METHOD_ETH_ERC20 = "eth_erc20"
 DEPOSIT_METHODS = (METHOD_BTC, METHOD_USDT_TRC20, METHOD_ETH_ERC20)
 
-MSG_MIN = "Minimum deposit is $100.00."
+MSG_MIN = "Minimum deposit is $10.00."
 MSG_MAX = "Maximum deposit is $10,000.00."
 MSG_AMOUNT_REQUIRED = "Please enter a deposit amount."
 MSG_AMOUNT_INVALID = "Please enter a valid deposit amount."

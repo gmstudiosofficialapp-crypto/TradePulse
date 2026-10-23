@@ -44,7 +44,7 @@ def test_limits_do_not_create_records_or_credit() -> None:
     with _client() as client:
         engine = get_trading()
         engine.set_live_balance("deposit-user", 25)
-        low = _create(client, 99.99)
+        low = _create(client, 9.99)
         high = _create(client, 10000.01)
         assert low.status_code == 400
         assert high.status_code == 400
@@ -57,7 +57,7 @@ def test_limits_do_not_create_records_or_credit() -> None:
 def test_bounds_are_accepted_without_crediting() -> None:
     with _client() as client:
         engine = get_trading()
-        minimum = _create(client, 100, "usdt_trc20", "trx123456")
+        minimum = _create(client, 10, "usdt_trc20", "trx123456")
         maximum = _create(client, 10000, "eth_erc20", "0xabcDEF123456")
         assert minimum.status_code == 200
         assert maximum.status_code == 200
