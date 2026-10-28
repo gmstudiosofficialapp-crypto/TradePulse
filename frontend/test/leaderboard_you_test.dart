@@ -35,23 +35,14 @@ Future<void> _pump(WidgetTester tester, TradingController trading) async {
 }
 
 void main() {
-  testWidgets('user row sits under the generated board with profit', (tester) async {
+  testWidgets('generated board does not include a personal row', (tester) async {
     final trading = TradingController(_BoardTrading());
     trading.statistics = const DemoStatistics(totalProfitLoss: 48.2);
     await _pump(tester, trading);
     expect(find.text('Isaac Hayes'), findsOneWidget);
-    expect(find.text('100+'), findsOneWidget);
-    expect(find.text('You'), findsOneWidget);
-    expect(find.text(r'+$48.20'), findsOneWidget);
+    expect(find.text('100+'), findsNothing);
+    expect(find.text('You'), findsNothing);
+    expect(find.text(r'+$48.20'), findsNothing);
     expect(find.text('Your trading today'), findsNothing);
-  });
-
-  testWidgets('user row shows a loss under the generated board', (tester) async {
-    final trading = TradingController(_BoardTrading());
-    trading.statistics = const DemoStatistics(totalProfitLoss: -12.5);
-    await _pump(tester, trading);
-    expect(find.text('100+'), findsOneWidget);
-    expect(find.text('You'), findsOneWidget);
-    expect(find.text(r'-$12.50'), findsOneWidget);
   });
 }

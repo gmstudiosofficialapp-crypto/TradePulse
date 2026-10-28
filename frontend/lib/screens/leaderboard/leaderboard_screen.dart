@@ -83,15 +83,12 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
                   ? const Center(child: CircularProgressIndicator())
                   : ListView.separated(
                       padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
-                      itemCount: _entries.length + 1,
+                      itemCount: _entries.length,
                       separatorBuilder: (_, __) => Divider(
                         height: 1,
                         color: colors.cardBorder.withValues(alpha: 0.5),
                       ),
                       itemBuilder: (context, index) {
-                        if (index == _entries.length) {
-                          return _youRow(context);
-                        }
                         final row = _entries[index];
                         final rank = row['rank'] as int? ?? index + 1;
                         final name = row['name'] as String? ?? '';
@@ -108,21 +105,6 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
           ],
         ),
       ),
-    );
-  }
-
-  Widget _youRow(BuildContext context) {
-    final colors = context.tpColors;
-    final trading = AppScope.trading(context);
-    final result = AppScope.settings(context).isLiveMode
-        ? trading.liveStatistics.totalProfitLoss
-        : trading.statistics.totalProfitLoss;
-    final amountColor = result < 0 ? colors.danger : colors.accent;
-    return _rankRow(
-      rank: '100+',
-      name: 'You',
-      amount: AppUtils.formatSignedMoney(result),
-      amountColor: amountColor,
     );
   }
 

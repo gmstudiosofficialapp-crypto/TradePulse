@@ -373,8 +373,15 @@ class TradingController extends ChangeNotifier {
         }
       }
     }
+    DemoTrade? clock = match;
+    for (final item in history) {
+      if (item.tradeId == opened.tradeId && item.isOpen) {
+        clock ??= item;
+      }
+    }
+    final shown = clock == null ? opened : opened.keepingClock(clock);
     history = [
-      opened,
+      shown,
       ...history.where(
         (item) => item.tradeId != opened.tradeId && item.tradeId != match?.tradeId,
       ),
@@ -387,6 +394,8 @@ class TradingController extends ChangeNotifier {
       final existing = byId[local.tradeId];
       if (existing == null && local.isOpen) {
         byId[local.tradeId] = local;
+      } else if (existing != null && existing.isOpen && local.isOpen) {
+        byId[local.tradeId] = existing.keepingClock(local);
       } else if (existing != null && existing.isOpen && !local.isOpen) {
         byId[local.tradeId] = local;
       }

@@ -117,6 +117,26 @@ class DemoTrade {
     return expiryTime.difference(entryTime).inSeconds.abs();
   }
 
+  DemoTrade keepingClock(DemoTrade clock) {
+    return DemoTrade(
+      tradeId: tradeId,
+      asset: asset,
+      direction: direction,
+      stake: stake,
+      entryPrice: entryPrice,
+      entryTime: clock.entryTime,
+      expiryTime: clock.expiryTime,
+      status: status,
+      expiryPrice: expiryPrice,
+      result: result,
+      profitLoss: profitLoss,
+      totalReturn: totalReturn,
+      payoutRate: payoutRate,
+      expirySeconds: clock.expirySeconds > 0 ? clock.expirySeconds : expirySeconds,
+      accountType: accountType,
+    );
+  }
+
   factory DemoTrade.fromJson(Map<String, dynamic> json) {
     return DemoTrade(
       tradeId: json['trade_id'] as String,
