@@ -59,7 +59,19 @@ class _SplashScreenState extends State<SplashScreen>
           opacity: _fade,
           child: ScaleTransition(
             scale: _scale,
-            child: const Center(child: TradePulseLogo()),
+            child: Center(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const TradePulseLogo(),
+                  const SizedBox(height: 16),
+                  Text(
+                    'Loading market…',
+                    style: Theme.of(context).textTheme.bodyMedium,
+                  ),
+                ],
+              ),
+            ),
           ),
         ),
         bottomNavigationBar: SafeArea(

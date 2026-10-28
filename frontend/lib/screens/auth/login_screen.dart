@@ -43,7 +43,10 @@ class _LoginScreenState extends State<LoginScreen> {
             password: _password.text,
           );
       if (!mounted) return;
-      Navigator.of(context).pushReplacementNamed(AppRoutes.home);
+      final next = AppScope.settings(context).seenOnboarding
+          ? AppRoutes.home
+          : AppRoutes.onboarding;
+      Navigator.of(context).pushReplacementNamed(next);
     } on AuthException catch (error) {
       setState(() => _error = error.message);
     } finally {

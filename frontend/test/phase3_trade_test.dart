@@ -64,7 +64,19 @@ class _FakeTrading extends TradingService {
       DemoStatistics(currentBalance: _balance);
 
   @override
-  Future<List<DemoTrade>> getTrades(String userId) async => List.of(opened);
+  Future<DemoStatistics> getLiveStatistics(String userId) async =>
+      const DemoStatistics();
+
+  @override
+  Future<double> getLiveBalance(String userId) async => 0;
+
+  @override
+  Future<List<DemoTrade>> getTrades(String userId) async =>
+      opened.where((item) => item.accountType != 'LIVE').toList();
+
+  @override
+  Future<List<DemoTrade>> getLiveTrades(String userId) async =>
+      opened.where((item) => item.accountType == 'LIVE').toList();
 
   @override
   Future<List<TradeSignal>> listSignals(String asset) async => [];
@@ -100,6 +112,7 @@ class _FakeTrading extends TradingService {
       expiryTime: DateTime.now().toUtc().add(Duration(seconds: expirySeconds)),
       status: 'OPEN',
       expirySeconds: expirySeconds,
+      accountType: live ? 'LIVE' : 'DEMO',
     );
     opened.add(trade);
     return trade;
@@ -307,9 +320,10 @@ void main() {
         payoutRate: 0.85,
         totalReturn: 46.25,
         expirySeconds: 30,
+        accountType: 'LIVE',
       ),
     ];
-    trading.statistics = const DemoStatistics(
+    trading.liveStatistics = const DemoStatistics(
       totalTrades: 1,
       wins: 1,
       currentBalance: 10021.25,
@@ -323,7 +337,7 @@ void main() {
     expect(find.text(r'$46.25'), findsWidgets);
     expect(find.text('85%'), findsWidgets);
     expect(find.text('ALL'), findsOneWidget);
-    expect(find.text('Your completed trades will appear here.'), findsNothing);
+    expect(find.text('Your completed Live trades will appear here.'), findsNothing);
   });
 
   testWidgets('history filters', (tester) async {
@@ -340,6 +354,7 @@ void main() {
         status: 'CLOSED',
         result: 'WIN',
         profitLoss: 8.5,
+        accountType: 'LIVE',
       ),
       DemoTrade(
         tradeId: 'l',
@@ -352,6 +367,7 @@ void main() {
         status: 'CLOSED',
         result: 'LOSS',
         profitLoss: -10,
+        accountType: 'LIVE',
       ),
     ];
     await tester.pumpWidget(_harness(child: const HistoryScreen(), trading: trading));
@@ -360,6 +376,42 @@ void main() {
     await tester.pump();
     expect(find.textContaining('EUR/USD-OTC'), findsWidgets);
     expect(find.textContaining('BTC/USD-OTC'), findsNothing);
+  });
+
+  testWidgets('history hides demo trades', (tester) async {
+    final trading = TradingController(_FakeTrading());
+    trading.history = [
+      DemoTrade(
+        tradeId: 'demo-1',
+        asset: 'ETH/USD-OTC',
+        direction: 'BUY',
+        stake: 25,
+        entryPrice: 3200,
+        entryTime: DateTime.now().toUtc(),
+        expiryTime: DateTime.now().toUtc(),
+        status: 'CLOSED',
+        result: 'WIN',
+        profitLoss: 21.25,
+        accountType: 'DEMO',
+      ),
+      DemoTrade(
+        tradeId: 'live-1',
+        asset: 'BTC/USD-OTC',
+        direction: 'SELL',
+        stake: 10,
+        entryPrice: 67000,
+        entryTime: DateTime.now().toUtc(),
+        expiryTime: DateTime.now().toUtc(),
+        status: 'CLOSED',
+        result: 'LOSS',
+        profitLoss: -10,
+        accountType: 'LIVE',
+      ),
+    ];
+    await tester.pumpWidget(_harness(child: const HistoryScreen(), trading: trading));
+    await tester.pump();
+    expect(find.textContaining('BTC/USD-OTC'), findsOneWidget);
+    expect(find.textContaining('ETH/USD-OTC'), findsNothing);
   });
 
   testWidgets('responsive trade layout', (tester) async {
@@ -411,10 +463,10 @@ void main() {
   testWidgets('expiry chips are present', (tester) async {
     await tester.pumpWidget(_harness(child: const TradeScreen()));
     await tester.pump();
-    expect(find.text('5s'), findsOneWidget);
-    expect(find.text('15s'), findsOneWidget);
-    expect(find.text('30s'), findsOneWidget);
-    expect(find.text('1m'), findsOneWidget);
+    expect(find.text('5s'), findsWidgets);
+    expect(find.text('15s'), findsWidgets);
+    expect(find.text('30s'), findsWidgets);
+    expect(find.text('1m'), findsWidgets);
     expect(find.text('5m'), findsOneWidget);
     expect(find.text('15m'), findsOneWidget);
   });

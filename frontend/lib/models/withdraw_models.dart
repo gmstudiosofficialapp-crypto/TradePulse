@@ -79,7 +79,7 @@ extension WithdrawStatusX on WithdrawStatus {
       };
 
   String get infoTitle => switch (this) {
-        WithdrawStatus.pending => 'Your withdrawal request is under review.',
+        WithdrawStatus.pending => 'Your withdrawal request is being processed.',
         WithdrawStatus.successful =>
           'Your withdrawal has been successfully processed.',
         WithdrawStatus.rejected => 'Your withdrawal request was rejected.',

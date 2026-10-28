@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 
 import '../../core/constants/app_constants.dart';
+import '../../core/l10n/app_strings.dart';
+import '../../core/routes/app_routes.dart';
 import '../../core/theme/app_colors.dart';
 import 'shell_destinations.dart';
 
@@ -65,7 +67,7 @@ class SideNav extends StatelessWidget {
                           ? item.selectedIcon
                           : item.icon,
                     ),
-                    title: Text(item.label),
+                    title: Text(_label(AppStrings.of(context), item.route)),
                     onTap: () => onSelect(item.route),
                   ),
                 ),
@@ -74,5 +76,16 @@ class SideNav extends StatelessWidget {
         ),
       ),
     );
+  }
+
+  String _label(AppStrings strings, String route) {
+    return switch (route) {
+      AppRoutes.home => strings.navHome,
+      AppRoutes.markets => strings.navMarkets,
+      AppRoutes.trade => strings.navTrade,
+      AppRoutes.history => strings.navHistory,
+      AppRoutes.profile => strings.navProfile,
+      _ => route,
+    };
   }
 }

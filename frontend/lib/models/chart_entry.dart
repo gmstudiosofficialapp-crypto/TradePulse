@@ -22,6 +22,10 @@ class ChartEntryMarker {
   final int expirySeconds;
   final String? result;
 
+  DateTime get expiryAt => entryTime.toUtc().add(Duration(seconds: durationSeconds));
+
+  int get durationSeconds => expirySeconds <= 0 ? 60 : expirySeconds;
+
   factory ChartEntryMarker.fromTrade(DemoTrade trade) {
     return ChartEntryMarker(
       tradeId: trade.tradeId,
@@ -52,11 +56,8 @@ bool candleContainsEntry(MarketCandle candle, DateTime entryTime) {
   final time = entryTime.toUtc();
   final open = candle.openTime.toUtc();
   final close = candle.closeTime.toUtc();
-  final windowEnd = candle.closed
-      ? close
-      : (close.isBefore(open.add(const Duration(minutes: 1)))
-          ? open.add(const Duration(minutes: 1))
-          : close);
+  final period = close.isAfter(open) ? close.difference(open) : const Duration(minutes: 1);
+  final windowEnd = candle.closed ? close : open.add(period);
   return !time.isBefore(open) && time.isBefore(windowEnd);
 }
 

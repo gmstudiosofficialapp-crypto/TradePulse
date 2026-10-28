@@ -201,7 +201,12 @@ class DemoTradingEngine:
 
     def ensure_account(self, user_id: str, email: str = "", name: str = "") -> dict:
         if hasattr(self.accounts, "ensure_user"):
-            return self.accounts.ensure_user(user_id, email=email, name=name)
+            state = self.accounts.ensure_user(user_id, email=email, name=name)
+            if state.get("signup_bonus_just_granted"):
+                getter = getattr(self.accounts, "get_live_balance", None)
+                if getter is not None:
+                    self._live_balance_cache[user_id] = getter(user_id)
+            return state
         return {"uid": user_id, "email": email, "displayName": name}
 
     def update_profile(self, user_id: str, fields: dict) -> dict:

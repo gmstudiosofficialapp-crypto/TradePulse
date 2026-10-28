@@ -7,6 +7,7 @@ import '../../screens/auth/signup_screen.dart';
 import '../../screens/history/history_screen.dart';
 import '../../screens/leaderboard/leaderboard_screen.dart';
 import '../../screens/home/home_screen.dart';
+import '../../screens/onboarding/onboarding_screen.dart';
 import '../../screens/markets/markets_screen.dart';
 import '../../screens/profile/change_password_screen.dart';
 import '../../screens/profile/edit_profile_screen.dart';
@@ -81,6 +82,7 @@ class AppRouter {
       AppRoutes.resetPassword => ResetPasswordScreen(
           oobCode: arguments is String ? arguments : null,
         ),
+      AppRoutes.onboarding => const OnboardingScreen(),
       AppRoutes.home => const HomeScreen(),
       AppRoutes.markets => const MarketsScreen(),
       AppRoutes.trade => TradeScreen(initialAsset: tradeAsset),

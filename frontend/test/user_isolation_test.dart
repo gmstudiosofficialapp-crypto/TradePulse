@@ -15,7 +15,17 @@ class _NoRemoteTrading extends TradingService {
       const DemoStatistics();
 
   @override
+  Future<DemoStatistics> getLiveStatistics(String userId) async =>
+      const DemoStatistics();
+
+  @override
+  Future<double> getLiveBalance(String userId) async => 0;
+
+  @override
   Future<List<DemoTrade>> getTrades(String userId) async => [];
+
+  @override
+  Future<List<DemoTrade>> getLiveTrades(String userId) async => [];
 }
 
 void main() {

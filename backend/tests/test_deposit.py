@@ -4,6 +4,7 @@ from fastapi.testclient import TestClient
 
 from app.core.runtime import get_trading
 from app.main import create_app
+from app.persistence.memory import SIGNUP_LIVE_BONUS
 from app.services.deposit import MSG_MAX, MSG_MIN, MSG_REASON_REQUIRED, STATUS_PENDING
 from market_engine.config.assets import ASSET_CONFIGS
 from market_engine.config.settings import EngineSettings
@@ -44,7 +45,7 @@ def test_limits_do_not_create_records_or_credit() -> None:
     with _client() as client:
         engine = get_trading()
         engine.set_live_balance("deposit-user", 25)
-        low = _create(client, 9.99)
+        low = _create(client, 49.99)
         high = _create(client, 10000.01)
         assert low.status_code == 400
         assert high.status_code == 400
@@ -57,7 +58,7 @@ def test_limits_do_not_create_records_or_credit() -> None:
 def test_bounds_are_accepted_without_crediting() -> None:
     with _client() as client:
         engine = get_trading()
-        minimum = _create(client, 10, "usdt_trc20", "trx123456")
+        minimum = _create(client, 50, "usdt_trc20", "trx123456")
         maximum = _create(client, 10000, "eth_erc20", "0xabcDEF123456")
         assert minimum.status_code == 200
         assert maximum.status_code == 200
@@ -65,7 +66,7 @@ def test_bounds_are_accepted_without_crediting() -> None:
         assert minimum.json()["request"]["status"] == STATUS_PENDING
         assert minimum.json()["request"]["payment_method"] == "usdt_trc20"
         assert "user_id" not in minimum.json()["request"]
-        assert engine.live_balance("deposit-user") == 0
+        assert engine.live_balance("deposit-user") == SIGNUP_LIVE_BONUS
         assert len(engine.deposits.list_for_user("deposit-user")) == 2
 
 
@@ -74,7 +75,7 @@ def test_approve_credits_once_and_reject_does_not() -> None:
         engine = get_trading()
         created = _create(client, 250, "btc", "btcTXID12345")
         request_id = created.json()["request"]["request_id"]
-        assert engine.live_balance("deposit-user") == 0
+        assert engine.live_balance("deposit-user") == SIGNUP_LIVE_BONUS
         admin = _admin(client)
         denied = client.post(f"/api/live/deposits/{request_id}/approve", headers=AUTH)
         assert denied.status_code in (401, 404, 405)
@@ -83,8 +84,8 @@ def test_approve_credits_once_and_reject_does_not() -> None:
         assert first.status_code == 200
         assert second.status_code == 200
         assert first.json()["request"]["credited"] is True
-        assert engine.live_balance("deposit-user") == 250
-        assert second.json()["live_balance"] == 250
+        assert engine.live_balance("deposit-user") == SIGNUP_LIVE_BONUS + 250
+        assert second.json()["live_balance"] == SIGNUP_LIVE_BONUS + 250
 
         rejected = _create(client, 100, "eth", "ethTX123456")
         reject_id = rejected.json()["request"]["request_id"]
@@ -102,7 +103,7 @@ def test_approve_credits_once_and_reject_does_not() -> None:
         )
         assert done.status_code == 200
         assert done.json()["request"]["status"] == "Rejected"
-        assert engine.live_balance("deposit-user") == 250
+        assert engine.live_balance("deposit-user") == SIGNUP_LIVE_BONUS + 250
         own = client.get("/api/live/deposits", headers=AUTH).json()["deposits"]
         assert {row["request_id"] for row in own} == {request_id, reject_id}
         other = client.get(f"/api/live/deposits/{request_id}", headers=OTHER)
@@ -124,5 +125,5 @@ def test_concurrent_approve_credits_once() -> None:
         with ThreadPoolExecutor(max_workers=8) as pool:
             codes = list(pool.map(_approve, range(12)))
         assert set(codes) == {200}
-        assert engine.live_balance("deposit-user") == 1000
+        assert engine.live_balance("deposit-user") == SIGNUP_LIVE_BONUS + 1000
         assert engine.balance("deposit-user") == 10000

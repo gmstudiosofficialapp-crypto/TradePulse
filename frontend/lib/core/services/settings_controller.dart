@@ -7,6 +7,7 @@ class SettingsController extends ChangeNotifier {
   bool notificationsEnabled = true;
   bool soundEnabled = false;
   String language = 'English';
+  var seenOnboarding = false;
   TradingUiMode tradingUiMode = TradingUiMode.demo;
   final Set<String> favoriteAssets = {};
 
@@ -39,6 +40,18 @@ class SettingsController extends ChangeNotifier {
 
   void setSound(bool value) {
     soundEnabled = value;
+    notifyListeners();
+  }
+
+  void setLanguage(String value) {
+    if (language == value) return;
+    language = value;
+    notifyListeners();
+  }
+
+  void markOnboardingSeen() {
+    if (seenOnboarding) return;
+    seenOnboarding = true;
     notifyListeners();
   }
 }

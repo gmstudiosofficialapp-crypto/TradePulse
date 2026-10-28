@@ -30,6 +30,12 @@ def set_token_verifier(verifier: TokenVerifier | None) -> TokenVerifier | None:
     return previous
 
 
+def _local_memory_auth_allowed() -> bool:
+    if os.getenv("RENDER"):
+        return False
+    return os.getenv("TRADEPULSE_PERSISTENCE", "firestore").strip().lower() == "memory"
+
+
 def verify_id_token(token: str) -> FirebaseUser:
     if _verifier is not None:
         return _verifier(token)
@@ -37,6 +43,9 @@ def verify_id_token(token: str) -> FirebaseUser:
         init_firebase_admin()
         decoded = auth.verify_id_token(token)
     except FirebaseAdminConfigError:
+        if _local_memory_auth_allowed():
+            project = os.getenv("FIREBASE_PROJECT_ID", "wallet-operator").strip() or "wallet-operator"
+            return _user_from_verified_claims(_unverified_payload(token), project)
         raise
     except Exception as exc:
         raise HTTPException(status_code=401, detail="Invalid or expired token") from exc

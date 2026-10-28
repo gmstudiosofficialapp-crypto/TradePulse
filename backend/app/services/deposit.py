@@ -7,7 +7,7 @@ from typing import Any
 
 from app.core.runtime import get_trading
 
-MIN_DEPOSIT = 10.0
+MIN_DEPOSIT = 50.0
 MAX_DEPOSIT = 10_000.0
 
 STATUS_PENDING = "Pending"
@@ -19,7 +19,7 @@ METHOD_USDT_TRC20 = "usdt_trc20"
 METHOD_ETH_ERC20 = "eth_erc20"
 DEPOSIT_METHODS = (METHOD_BTC, METHOD_USDT_TRC20, METHOD_ETH_ERC20)
 
-MSG_MIN = "Minimum deposit is $10.00."
+MSG_MIN = "Minimum deposit is $50.00."
 MSG_MAX = "Maximum deposit is $10,000.00."
 MSG_AMOUNT_REQUIRED = "Please enter a deposit amount."
 MSG_AMOUNT_INVALID = "Please enter a valid deposit amount."
@@ -33,8 +33,8 @@ MSG_ALREADY_SUCCESSFUL = "This deposit has already been approved."
 MSG_ALREADY_REJECTED = "This deposit has already been rejected."
 SUBMITTED_MESSAGE = (
     "Deposit request submitted.\n"
-    "Your request is under review.\n"
-    "Live Balance is not credited until an administrator approves it."
+    "Your request has been received.\n"
+    "Live Balance will be updated after processing."
 )
 
 _TXID = re.compile(r"^[A-Za-z0-9]{6,128}$")

@@ -478,7 +478,7 @@ void main() {
     expect(find.text('wd-pending-1'), findsOneWidget);
     expect(find.text('THfnsscby3ZW3LPGbTyGLyLkFsFdRwV5Xq'), findsOneWidget);
     expect(find.text('In progress'), findsOneWidget);
-    expect(find.text('Your withdrawal request is under review.'), findsOneWidget);
+    expect(find.text('Your withdrawal request is being processed.'), findsOneWidget);
     expect(find.text("We'll notify you once there is an update."), findsOneWidget);
     expect(find.text('Approve'), findsNothing);
     expect(find.text('Reject'), findsNothing);

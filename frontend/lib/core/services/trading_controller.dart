@@ -22,6 +22,7 @@ class TradingController extends ChangeNotifier {
   bool submitting = false;
   int _openInFlight = 0;
   DemoStatistics statistics = const DemoStatistics();
+  DemoStatistics liveStatistics = const DemoStatistics();
   List<DemoTrade> history = [];
   List<TradeSignal> signals = [];
   DemoTrade? lastResult;
@@ -32,6 +33,9 @@ class TradingController extends ChangeNotifier {
 
   List<DemoTrade> get activeTrades =>
       history.where((trade) => trade.isOpen).toList();
+
+  List<DemoTrade> get liveHistory =>
+      history.where((trade) => trade.accountType == 'LIVE').toList();
 
   DemoTrade? get activeTrade =>
       activeTrades.isEmpty ? null : activeTrades.first;
@@ -150,6 +154,7 @@ class TradingController extends ChangeNotifier {
       final nextBalance = await _service.getBalance(id);
       liveBalance = await _service.getLiveBalance(id);
       statistics = await _service.getStatistics(id);
+      liveStatistics = await _service.getLiveStatistics(id);
       final demoRows = await _service.getTrades(id);
       final liveRows = await _service.getLiveTrades(id);
       history = _mergeHistory([...demoRows, ...liveRows]);
@@ -206,6 +211,17 @@ class TradingController extends ChangeNotifier {
     notifyListeners();
   }
 
+  String _publicError(String raw) {
+    final lower = raw.toLowerCase();
+    if (lower.contains('firebase') ||
+        lower.contains('service_account') ||
+        lower.contains('credentials') ||
+        lower.contains('503')) {
+      return 'Trading account unreachable';
+    }
+    return raw;
+  }
+
   Future<void> openTrade({
     required String asset,
     required String direction,
@@ -257,6 +273,7 @@ class TradingController extends ChangeNotifier {
       status: 'OPEN',
       expirySeconds: expirySeconds,
       payoutRate: OtcAssets.payoutRate(asset),
+      accountType: usingLive ? 'LIVE' : 'DEMO',
     );
     _upsert(optimistic);
     if (usingLive) {
@@ -285,7 +302,7 @@ class TradingController extends ChangeNotifier {
       } else {
         balance += stake;
       }
-      error = exc.toString().replaceFirst('Exception: ', '');
+      error = _publicError(exc.toString().replaceFirst('Exception: ', ''));
     } finally {
       _openInFlight = (_openInFlight - 1).clamp(0, 10);
       submitting = _openInFlight > 0;
@@ -393,8 +410,10 @@ class TradingController extends ChangeNotifier {
     }
     final rows = byId.values.toList()
       ..sort((a, b) => b.entryTime.compareTo(a.entryTime));
-    if (rows.length <= 100) return rows;
-    return rows.take(100).toList();
+    final live = rows.where((item) => item.accountType == 'LIVE').take(100);
+    final demo = rows.where((item) => item.accountType != 'LIVE').take(100);
+    return [...live, ...demo]
+      ..sort((a, b) => b.entryTime.compareTo(a.entryTime));
   }
 
   void _upsertSignal(TradeSignal next) {

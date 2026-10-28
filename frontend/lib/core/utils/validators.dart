@@ -43,6 +43,10 @@ class Validators {
     return null;
   }
 
+  static const depositMin = 50.0;
+  static const depositMax = 10000.0;
+  static const depositMinMessage = r'Minimum deposit is $50.00.';
+  static const depositMaxMessage = r'Maximum deposit is $10,000.00.';
   static const withdrawMin = 50.0;
   static const withdrawMax = 10000.0;
   static const usdToBdt = 124.0;
@@ -162,11 +166,11 @@ class Validators {
     if (parsed == null) {
       return 'Enter a valid amount';
     }
-    if (parsed < 10) {
-      return 'Minimum deposit is \$10.00.';
+    if (parsed < depositMin) {
+      return depositMinMessage;
     }
-    if (parsed > 10000) {
-      return 'Maximum deposit is \$10,000.00.';
+    if (parsed > depositMax) {
+      return depositMaxMessage;
     }
     return null;
   }

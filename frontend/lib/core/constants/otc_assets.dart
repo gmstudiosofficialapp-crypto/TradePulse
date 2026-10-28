@@ -94,8 +94,12 @@ class OtcAssets {
     };
   }
 
+  static String formatPriceValue(String symbol, double price) {
+    return price.toStringAsFixed(pricePrecision(symbol));
+  }
+
   static String formatAssetPrice(String symbol, double price) {
-    final text = price.toStringAsFixed(pricePrecision(symbol));
+    final text = formatPriceValue(symbol, price);
     final quote = quoteCurrency(symbol);
     if (quote == 'USD') return '\$$text';
     return '$text $quote';

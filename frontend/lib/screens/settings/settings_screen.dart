@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../core/constants/app_constants.dart';
+import '../../core/l10n/app_strings.dart';
 import '../../core/routes/app_routes.dart';
 import '../../core/services/app_scope.dart';
 import '../../widgets/cards/premium_card.dart';
@@ -36,14 +37,14 @@ class SettingsScreen extends StatelessWidget {
             child: ListView(
               padding: const EdgeInsets.all(20),
               children: [
-                const SectionHeader(title: 'Appearance'),
+                SectionHeader(title: AppStrings.of(context).appearance),
                 const SizedBox(height: 12),
                 PremiumCard(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        'Theme',
+                        AppStrings.of(context).theme,
                         style: Theme.of(context).textTheme.titleSmall,
                       ),
                       const SizedBox(height: 12),
@@ -92,9 +93,28 @@ class SettingsScreen extends StatelessWidget {
                         onChanged: settings.setSound,
                       ),
                       ListTile(
-                        title: const Text('Language'),
+                        title: Text(AppStrings.of(context).language),
                         subtitle: Text(settings.language),
-                        trailing: const Text('Placeholder'),
+                      ),
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+                        child: SegmentedButton<String>(
+                          showSelectedIcon: false,
+                          segments: [
+                            ButtonSegment(
+                              value: 'English',
+                              label: Text(AppStrings.of(context).english),
+                            ),
+                            ButtonSegment(
+                              value: 'বাংলা',
+                              label: Text(AppStrings.of(context).bengali),
+                            ),
+                          ],
+                          selected: {settings.language},
+                          onSelectionChanged: (selected) {
+                            settings.setLanguage(selected.first);
+                          },
+                        ),
                       ),
                     ],
                   ),

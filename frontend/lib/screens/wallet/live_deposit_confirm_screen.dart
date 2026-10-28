@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 
 import '../../core/routes/app_routes.dart';
 import '../../core/services/app_scope.dart';
@@ -15,6 +14,7 @@ import '../../widgets/feedback/error_state.dart';
 import '../../widgets/forms/app_text_field.dart';
 import '../../widgets/layout/atmosphere_background.dart';
 import '../../widgets/layout/responsive_body.dart';
+import '../../widgets/wallet/deposit_address_panel.dart';
 
 class LiveDepositConfirmScreen extends StatefulWidget {
   const LiveDepositConfirmScreen({super.key, required this.draft});
@@ -34,16 +34,6 @@ class _LiveDepositConfirmScreenState extends State<LiveDepositConfirmScreen> {
   void dispose() {
     _txid.dispose();
     super.dispose();
-  }
-
-  Future<void> _copy() async {
-    await Clipboard.setData(
-      ClipboardData(text: widget.draft.asset.placeholderAddress),
-    );
-    if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Address copied')),
-    );
   }
 
   Future<void> _submit() async {
@@ -72,7 +62,7 @@ class _LiveDepositConfirmScreenState extends State<LiveDepositConfirmScreen> {
         context: context,
         builder: (context) => AlertDialog(
           title: const Text('Deposit request submitted'),
-          content: Text('${result['message'] ?? 'Your request is under review.'}'),
+          content: Text('${result['message'] ?? 'Your request has been received.'}'),
           actions: [
             TextButton(
               onPressed: () => Navigator.of(context).pop(),
@@ -116,22 +106,37 @@ class _LiveDepositConfirmScreenState extends State<LiveDepositConfirmScreen> {
           child: ListView(
             padding: const EdgeInsets.fromLTRB(20, 16, 20, 28),
             children: [
+              const _ConfirmSteps(),
+              const SizedBox(height: 18),
               PremiumCard(
+                emphasized: true,
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text('Payment Method', style: _labelStyle(context)),
-                    const SizedBox(height: 10),
+                    const SizedBox(height: 12),
                     Row(
                       children: [
-                        AssetIcon(symbol: asset.iconSymbol, size: 40),
+                        AssetIcon(symbol: asset.iconSymbol, size: 44),
                         const SizedBox(width: 12),
                         Expanded(
-                          child: Text(
-                            asset.title,
-                            style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                                  fontWeight: FontWeight.w800,
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                asset.title,
+                                style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                                      fontWeight: FontWeight.w800,
+                                    ),
+                              ),
+                              Text(
+                                asset.depositNetworkLabel,
+                                style: TextStyle(
+                                  color: colors.mutedText,
+                                  fontWeight: FontWeight.w600,
                                 ),
+                              ),
+                            ],
                           ),
                         ),
                       ],
@@ -143,7 +148,7 @@ class _LiveDepositConfirmScreenState extends State<LiveDepositConfirmScreen> {
                       AppUtils.formatMoney(widget.draft.amount),
                       style: Theme.of(context).textTheme.headlineMedium?.copyWith(
                             fontWeight: FontWeight.w800,
-                            color: Theme.of(context).colorScheme.onSurface,
+                            color: colors.accent,
                           ),
                     ),
                   ],
@@ -152,37 +157,13 @@ class _LiveDepositConfirmScreenState extends State<LiveDepositConfirmScreen> {
               const SizedBox(height: 16),
               PremiumCard(
                 child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text('Deposit Address', style: _labelStyle(context)),
-                    const SizedBox(height: 6),
-                    Text(
-                      asset.depositNetworkLabel,
-                      style: TextStyle(
-                        color: colors.mutedText,
-                        fontSize: 13,
-                        fontWeight: FontWeight.w600,
-                      ),
+                    Align(
+                      alignment: Alignment.centerLeft,
+                      child: Text('Deposit Address', style: _labelStyle(context)),
                     ),
-                    const SizedBox(height: 12),
-                    SelectableText(
-                      asset.placeholderAddress,
-                      style: const TextStyle(
-                        fontFamily: 'monospace',
-                        fontSize: 13,
-                        height: 1.45,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                    const SizedBox(height: 14),
-                    SizedBox(
-                      width: double.infinity,
-                      child: OutlinedButton.icon(
-                        onPressed: _copy,
-                        icon: const Icon(Icons.copy, size: 16),
-                        label: const Text('Copy Address'),
-                      ),
-                    ),
+                    const SizedBox(height: 16),
+                    DepositAddressPanel(asset: asset),
                   ],
                 ),
               ),
@@ -228,7 +209,7 @@ class _LiveDepositConfirmScreenState extends State<LiveDepositConfirmScreen> {
               ),
               const SizedBox(height: 12),
               Text(
-                'Submitting a request does not credit Live Balance. An administrator must approve it first.',
+                'Live Balance is added after this request is processed.',
                 style: TextStyle(color: colors.mutedText, fontSize: 12),
                 textAlign: TextAlign.center,
               ),
@@ -236,6 +217,60 @@ class _LiveDepositConfirmScreenState extends State<LiveDepositConfirmScreen> {
           ),
         ),
       ),
+    );
+  }
+}
+
+class _ConfirmSteps extends StatelessWidget {
+  const _ConfirmSteps();
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.tpColors;
+    const labels = ['Method', 'Amount', 'Confirm'];
+    return Row(
+      children: [
+        for (var i = 0; i < labels.length; i++) ...[
+          if (i > 0)
+            Expanded(
+              child: Container(
+                height: 2,
+                margin: const EdgeInsets.only(bottom: 18),
+                color: colors.accent,
+              ),
+            ),
+          Column(
+            children: [
+              Container(
+                width: 28,
+                height: 28,
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: colors.accent,
+                ),
+                child: Text(
+                  '${i + 1}',
+                  style: const TextStyle(
+                    fontWeight: FontWeight.w800,
+                    fontSize: 12,
+                    color: Color(0xFF061018),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 6),
+              Text(
+                labels[i],
+                style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w800,
+                  color: colors.accent,
+                ),
+              ),
+            ],
+          ),
+        ],
+      ],
     );
   }
 }

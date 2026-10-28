@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../core/l10n/app_strings.dart';
 import '../../core/services/app_scope.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/utils/app_utils.dart';
@@ -64,6 +65,24 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
                 ],
               ),
             ),
+            if (AppScope.trading(context).statistics.totalTrades > 0)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(20, 0, 20, 12),
+                child: Card(
+                  child: ListTile(
+                    title: Text(AppStrings.of(context).yourToday),
+                    subtitle: Text(
+                      '${AppScope.trading(context).statistics.wins}W / ${AppScope.trading(context).statistics.losses}L',
+                    ),
+                    trailing: Text(
+                      AppUtils.formatSignedMoney(
+                        AppScope.trading(context).statistics.totalProfitLoss,
+                      ),
+                      style: const TextStyle(fontWeight: FontWeight.w800),
+                    ),
+                  ),
+                ),
+              ),
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 20),
               child: Row(

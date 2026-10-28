@@ -11,8 +11,7 @@ def _now() -> str:
     return datetime.now(timezone.utc).isoformat()
 
 
-SIGNUP_LIVE_BONUS = 0.0
-INITIAL_LIVE_BALANCE = 0.0
+SIGNUP_LIVE_BONUS = 10.0
 
 
 class FirestoreAccountStore:
@@ -97,15 +96,15 @@ class FirestoreAccountStore:
             payload = {
                 "uid": user_id,
                 "balance": self.initial,
-                "live_balance": INITIAL_LIVE_BALANCE,
-                "signup_bonus_granted": False,
+                "live_balance": SIGNUP_LIVE_BONUS,
+                "signup_bonus_granted": True,
                 "createdAt": now,
                 "updatedAt": now,
             }
             txn.set(account_ref, payload)
             return {
-                "signup_bonus_granted": False,
-                "signup_bonus_just_granted": False,
+                "signup_bonus_granted": True,
+                "signup_bonus_just_granted": True,
             }
 
         bonus = _ensure_account(self._db.transaction())

@@ -102,9 +102,9 @@ class _DepositDetailsScreenState extends State<DepositDetailsScreen> {
                           Text(
                             switch (request.status) {
                               WithdrawStatus.pending =>
-                                'Under review. Live Balance is not credited until an administrator approves this request.',
+                                'This request is being processed. Live Balance is not credited yet.',
                               WithdrawStatus.successful =>
-                                'An administrator approved this request. Live Balance was credited once for this deposit.',
+                                'This deposit was credited to Live Balance.',
                               WithdrawStatus.rejected =>
                                 'This request was rejected. Live Balance was not credited.',
                             },

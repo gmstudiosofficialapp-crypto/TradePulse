@@ -49,9 +49,9 @@ def test_user_and_account_created() -> None:
         body = created.json()
         assert body["user"]["uid"] == "uid1"
         assert body["balance"] == 10000.0
-        assert body["live_balance"] == 0.0
-        assert body["signup_bonus_granted"] is False
-        assert body["signup_bonus_just_granted"] is False
+        assert body["live_balance"] == 10.0
+        assert body["signup_bonus_granted"] is True
+        assert body["signup_bonus_just_granted"] is True
         again = client.get(
             "/api/demo/balance",
             headers={"Authorization": "Bearer uid1|one@example.com"},
@@ -132,3 +132,37 @@ def test_require_user_dependency() -> None:
             return FirebaseUser(uid=token, email=f"{token}@example.com", name="Test User")
 
         set_token_verifier(_restore)
+
+
+def _unsigned_firebase_jwt(uid: str, email: str) -> str:
+    import base64
+    import json
+
+    def _part(data: dict) -> str:
+        raw = json.dumps(data, separators=(",", ":")).encode("utf-8")
+        return base64.urlsafe_b64encode(raw).decode("ascii").rstrip("=")
+
+    header = _part({"alg": "none", "typ": "JWT"})
+    payload = _part(
+        {
+            "aud": "wallet-operator",
+            "iss": "https://securetoken.google.com/wallet-operator",
+            "uid": uid,
+            "sub": uid,
+            "email": email,
+            "firebase": {"sign_in_provider": "password"},
+        }
+    )
+    return f"{header}.{payload}.sig"
+
+
+def test_memory_local_accepts_firebase_jwt_without_admin(monkeypatch) -> None:
+    monkeypatch.delenv("RENDER", raising=False)
+    monkeypatch.setenv("TRADEPULSE_PERSISTENCE", "memory")
+    previous = set_token_verifier(None)
+    try:
+        user = verify_id_token(_unsigned_firebase_jwt("bonus-user", "bonus@tradepulse.test"))
+        assert user.uid == "bonus-user"
+        assert user.email == "bonus@tradepulse.test"
+    finally:
+        set_token_verifier(previous)

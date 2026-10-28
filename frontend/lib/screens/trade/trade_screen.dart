@@ -178,10 +178,14 @@ class _TradeScreenState extends State<TradeScreen> {
       resizeToAvoidBottomInset: false,
       body: LayoutBuilder(
         builder: (context, constraints) {
+          final desktop = constraints.maxWidth >= 960;
           final watchWidth = math.min(280.0, constraints.maxWidth - 24);
-          const ticketReserve = 214.0;
+          final ticketWidth = desktop ? 300.0 : constraints.maxWidth;
+          final overlayInsets = desktop
+              ? const EdgeInsets.fromLTRB(0, 92, 0, 12)
+              : const EdgeInsets.fromLTRB(0, 148, 0, 236);
 
-          return Stack(
+          final chartStack = Stack(
             children: [
               Positioned.fill(
                 child: CandlestickChart(
@@ -192,24 +196,51 @@ class _TradeScreenState extends State<TradeScreen> {
                   immersive: true,
                   livePrice: quote?.price,
                   feedState: market.status.state,
-                  overlayInsets: const EdgeInsets.fromLTRB(0, 92, 0, 236),
+                  overlayInsets: overlayInsets,
+                  asset: market.focusedAsset,
+                  timeframeSeconds: market.chartTimeframe,
                 ),
               ),
               Positioned(
                 top: 8,
                 left: 12,
-                right: 12,
-                child: _TradeTopBar(
-                  asset: market.focusedAsset,
-                  price: quote?.price,
-                  reconnecting: reconnecting,
-                  onToggleWatchlist: () =>
-                      setState(() => _watchlistOpen = !_watchlistOpen),
+                right: desktop ? 8 : 12,
+                child: Column(
+                  children: [
+                    _TradeTopBar(
+                      asset: market.focusedAsset,
+                      price: quote?.price,
+                      reconnecting: reconnecting,
+                      onToggleWatchlist: () =>
+                          setState(() => _watchlistOpen = !_watchlistOpen),
+                    ),
+                    const SizedBox(height: 8),
+                    Align(
+                      alignment: Alignment.centerLeft,
+                      child: _ChartTimeframeBar(
+                        selected: market.chartTimeframe,
+                        onSelect: market.setChartTimeframe,
+                      ),
+                    ),
+                    if (!desktop) ...[
+                      const SizedBox(height: 8),
+                      _AssetChips(
+                        selected: market.focusedAsset,
+                        onSelect: (symbol) => unawaited(_selectAsset(symbol)),
+                      ),
+                    ],
+                  ],
                 ),
+              ),
+              Positioned(
+                top: desktop ? 92 : 148,
+                left: 12,
+                width: math.min(280, constraints.maxWidth - (desktop ? 24 : 24)),
+                child: _SignalBanner(signal: trading.signal),
               ),
               if (_flashResult != null)
                 Positioned(
-                  top: 96,
+                  top: desktop ? 92 : 148,
                   left: 0,
                   right: 0,
                   child: IgnorePointer(
@@ -218,36 +249,182 @@ class _TradeScreenState extends State<TradeScreen> {
                 ),
               if (_watchlistOpen)
                 Positioned(
-                  top: 96,
+                  top: desktop ? 92 : 108,
                   left: 12,
-                  bottom: ticketReserve + 16,
+                  bottom: desktop ? 12 : 248,
                   width: watchWidth,
                   child: watchlist,
                 ),
-              Positioned(
-                left: 0,
-                right: 0,
-                bottom: 0,
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    if (actives.isNotEmpty)
-                      Padding(
-                        padding: const EdgeInsets.fromLTRB(12, 0, 12, 6),
-                        child: _ActiveTradesBar(
-                          trades: actives,
-                          expanded: _activeOpen,
-                          onToggle: () => setState(() => _activeOpen = !_activeOpen),
-                          onSelect: (id) => setState(() => _highlightId = id),
+              if (!desktop)
+                Positioned(
+                  left: 0,
+                  right: 0,
+                  bottom: 0,
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      if (actives.isNotEmpty)
+                        Padding(
+                          padding: const EdgeInsets.fromLTRB(12, 0, 12, 6),
+                          child: _ActiveTradesBar(
+                            trades: actives,
+                            expanded: _activeOpen,
+                            onToggle: () => setState(() => _activeOpen = !_activeOpen),
+                            onSelect: (id) => setState(() => _highlightId = id),
+                          ),
                         ),
-                      ),
-                    panel,
-                  ],
+                      panel,
+                    ],
+                  ),
+                ),
+            ],
+          );
+
+          if (!desktop) return chartStack;
+          return Row(
+            children: [
+              Expanded(child: chartStack),
+              SizedBox(
+                width: ticketWidth,
+                child: ColoredBox(
+                  color: context.tpColors.card.withValues(alpha: 0.97),
+                  child: Column(
+                    children: [
+                      if (actives.isNotEmpty)
+                        Padding(
+                          padding: const EdgeInsets.fromLTRB(12, 12, 12, 0),
+                          child: _ActiveTradesBar(
+                            trades: actives,
+                            expanded: _activeOpen,
+                            onToggle: () => setState(() => _activeOpen = !_activeOpen),
+                            onSelect: (id) => setState(() => _highlightId = id),
+                          ),
+                        ),
+                      Expanded(child: SingleChildScrollView(child: panel)),
+                    ],
+                  ),
                 ),
               ),
             ],
           );
         },
+      ),
+    );
+  }
+}
+
+class _ChartTimeframeBar extends StatelessWidget {
+  const _ChartTimeframeBar({
+    required this.selected,
+    required this.onSelect,
+  });
+
+  final int selected;
+  final ValueChanged<int> onSelect;
+
+  @override
+  Widget build(BuildContext context) {
+    return Wrap(
+      spacing: 4,
+      children: [
+        for (final seconds in const [5, 15, 30, 60])
+          ChoiceChip(
+            visualDensity: VisualDensity.compact,
+            label: Text(AppUtils.formatExpiryLabel(seconds)),
+            selected: selected == seconds,
+            onSelected: (_) => onSelect(seconds),
+          ),
+      ],
+    );
+  }
+}
+
+class _AssetChips extends StatelessWidget {
+  const _AssetChips({required this.selected, required this.onSelect});
+
+  final String selected;
+  final ValueChanged<String> onSelect;
+
+  @override
+  Widget build(BuildContext context) {
+    final settings = AppScope.settings(context);
+    final symbols = <String>[
+      ...settings.favoriteAssets,
+      ...OtcAssets.popular.map((asset) => asset.symbol),
+    ];
+    final unique = <String>[];
+    for (final symbol in symbols) {
+      if (!unique.contains(symbol)) unique.add(symbol);
+    }
+    return SizedBox(
+      height: 36,
+      child: ListView.separated(
+        scrollDirection: Axis.horizontal,
+        itemCount: unique.length,
+        separatorBuilder: (_, _) => const SizedBox(width: 8),
+        itemBuilder: (context, index) {
+          final symbol = unique[index];
+          final active = symbol == selected;
+          return ChoiceChip(
+            visualDensity: VisualDensity.compact,
+            selected: active,
+            label: Text(symbol.replaceAll('-OTC', '')),
+            onSelected: (_) => onSelect(symbol),
+          );
+        },
+      ),
+    );
+  }
+}
+
+class _SignalBanner extends StatelessWidget {
+  const _SignalBanner({required this.signal});
+
+  final TradeSignal signal;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.tpColors;
+    final buy = signal.direction == 'BUY';
+    final sell = signal.direction == 'SELL';
+    final tone = buy
+        ? colors.success
+        : sell
+            ? colors.danger
+            : colors.mutedText;
+    final remaining = signal.expiryTime == null
+        ? null
+        : signal.expiryTime!.difference(DateTime.now().toUtc()).inSeconds;
+    return PremiumCard(
+      glass: true,
+      padding: const EdgeInsets.fromLTRB(10, 8, 10, 8),
+      child: Row(
+        children: [
+          Icon(
+            buy
+                ? Icons.trending_up
+                : sell
+                    ? Icons.trending_down
+                    : Icons.pause_circle_outline,
+            color: tone,
+          ),
+          const SizedBox(width: 8),
+          Text(
+            'SIGNAL ${signal.direction}',
+            style: TextStyle(fontWeight: FontWeight.w800, color: tone),
+          ),
+          const SizedBox(width: 8),
+          Text(
+            '${(signal.confidence * 100).round()}%',
+            style: TextStyle(color: colors.mutedText, fontWeight: FontWeight.w700),
+          ),
+          const Spacer(),
+          if (remaining != null && remaining > 0)
+            Text(
+              '${remaining}s',
+              style: const TextStyle(fontWeight: FontWeight.w800),
+            ),
+        ],
       ),
     );
   }
@@ -329,7 +506,7 @@ class _TradeTopBar extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.end,
               children: [
                 Text(
-                  price == null ? '—' : AppUtils.formatPrice(price!),
+                  price == null ? '—' : OtcAssets.formatAssetPrice(asset, price!),
                   style: const TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.w700,
@@ -628,6 +805,7 @@ class _ManualTradePanelState extends State<_ManualTradePanel> {
     final colors = context.tpColors;
     final onEmphasis = Theme.of(context).colorScheme.onSecondary;
     final controller = widget.trading;
+    final payout = OtcAssets.payoutLabel(AppScope.market(context).focusedAsset);
     return DecoratedBox(
       decoration: BoxDecoration(
         color: colors.card.withValues(alpha: 0.96),
@@ -635,7 +813,7 @@ class _ManualTradePanelState extends State<_ManualTradePanel> {
         border: Border(top: BorderSide(color: colors.cardBorder.withValues(alpha: 0.7))),
       ),
       child: Padding(
-        padding: const EdgeInsets.fromLTRB(16, 10, 16, 12),
+        padding: const EdgeInsets.fromLTRB(16, 12, 16, 14),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -651,80 +829,89 @@ class _ManualTradePanelState extends State<_ManualTradePanel> {
                   ),
               ],
             ),
-            const SizedBox(height: 10),
-            Row(
-              children: [
-                Expanded(
-                  child: _TicketField(
-                    label: 'Time',
-                    value: _hhmmss(controller.expirySeconds),
-                    icon: Icons.schedule,
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: _TicketField(
-                    label: 'Amount',
-                    icon: Icons.payments_outlined,
-                    child: TextField(
-                      controller: _amount,
-                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                      textAlign: TextAlign.center,
-                      style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w700),
-                      onChanged: _commitAmount,
-                      decoration: const InputDecoration(
-                        isDense: true,
-                        border: InputBorder.none,
-                        enabledBorder: InputBorder.none,
-                        focusedBorder: InputBorder.none,
-                      ),
-                    ),
-                  ),
-                ),
-              ],
+            const SizedBox(height: 12),
+            _StepperField(
+              label: 'Time',
+              value: _hhmmss(controller.expirySeconds),
+              onMinus: () => _stepExpiry(-1),
+              onPlus: () => _stepExpiry(1),
             ),
-            const SizedBox(height: 8),
-            Text(
-              'Payout ${OtcAssets.payoutLabel(AppScope.market(context).focusedAsset)}',
-              style: TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.w700,
-                color: colors.mutedText,
+            const SizedBox(height: 10),
+            _StepperField(
+              label: 'Amount',
+              onMinus: () {
+                controller.bumpStake(controller.stake >= 100 ? -10 : -1);
+                _amount.text = AppUtils.formatStakeInput(controller.stake);
+              },
+              onPlus: () {
+                controller.bumpStake(controller.stake >= 100 ? 10 : 1);
+                _amount.text = AppUtils.formatStakeInput(controller.stake);
+              },
+              child: TextField(
+                controller: _amount,
+                keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                textAlign: TextAlign.center,
+                style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w700),
+                onChanged: _commitAmount,
+                decoration: const InputDecoration(
+                  isDense: true,
+                  border: InputBorder.none,
+                  enabledBorder: InputBorder.none,
+                  focusedBorder: InputBorder.none,
+                ),
               ),
             ),
-            const SizedBox(height: 8),
+            const SizedBox(height: 12),
             Row(
               children: [
                 Expanded(
                   child: FilledButton(
-                      style: FilledButton.styleFrom(
-                        backgroundColor: colors.success,
-                        foregroundColor: onEmphasis,
-                        minimumSize: const Size.fromHeight(56),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                      ),
-                      onPressed: widget.canTrade ? widget.onBuy : null,
-                      child: const Text(
-                        'BUY',
-                        style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800),
-                      ),
+                    style: FilledButton.styleFrom(
+                      backgroundColor: colors.success,
+                      foregroundColor: onEmphasis,
+                      minimumSize: const Size.fromHeight(64),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                     ),
+                    onPressed: widget.canTrade ? widget.onBuy : null,
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Text(
+                          'BUY',
+                          style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800),
+                        ),
+                        Text(
+                          payout,
+                          style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
+                        ),
+                      ],
+                    ),
+                  ),
                 ),
                 const SizedBox(width: 10),
                 Expanded(
                   child: FilledButton(
-                      style: FilledButton.styleFrom(
-                        backgroundColor: colors.danger,
-                        foregroundColor: onEmphasis,
-                        minimumSize: const Size.fromHeight(56),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                      ),
-                      onPressed: widget.canTrade ? widget.onSell : null,
-                      child: const Text(
-                        'SELL',
-                        style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800),
-                      ),
+                    style: FilledButton.styleFrom(
+                      backgroundColor: colors.danger,
+                      foregroundColor: onEmphasis,
+                      minimumSize: const Size.fromHeight(64),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                     ),
+                    onPressed: widget.canTrade ? widget.onSell : null,
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Text(
+                          'SELL',
+                          style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800),
+                        ),
+                        Text(
+                          payout,
+                          style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
+                        ),
+                      ],
+                    ),
+                  ),
                 ),
               ],
             ),
@@ -737,18 +924,29 @@ class _ManualTradePanelState extends State<_ManualTradePanel> {
       ),
     );
   }
+
+  void _stepExpiry(int delta) {
+    final options = AppConstants.expiryOptions;
+    final index = options.indexOf(widget.trading.expirySeconds);
+    final next = (index < 0 ? 0 : index) + delta;
+    if (next < 0 || next >= options.length) return;
+    widget.trading.setExpiry(options[next]);
+    setState(() {});
+  }
 }
 
-class _TicketField extends StatelessWidget {
-  const _TicketField({
+class _StepperField extends StatelessWidget {
+  const _StepperField({
     required this.label,
-    required this.icon,
+    required this.onMinus,
+    required this.onPlus,
     this.value,
     this.child,
   });
 
   final String label;
-  final IconData icon;
+  final VoidCallback onMinus;
+  final VoidCallback onPlus;
   final String? value;
   final Widget? child;
 
@@ -756,26 +954,35 @@ class _TicketField extends StatelessWidget {
   Widget build(BuildContext context) {
     final colors = context.tpColors;
     return Container(
-      padding: const EdgeInsets.fromLTRB(12, 8, 12, 8),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
       decoration: BoxDecoration(
         color: colors.canvasAlt.withValues(alpha: 0.55),
         borderRadius: BorderRadius.circular(12),
       ),
       child: Row(
         children: [
+          IconButton(
+            onPressed: onMinus,
+            icon: const Icon(Icons.remove),
+          ),
           Expanded(
             child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(label, style: TextStyle(fontSize: 11, color: colors.mutedText)),
-                if (child != null) child! else Text(
-                  value ?? '',
-                  style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w700),
-                ),
+                if (child != null)
+                  child!
+                else
+                  Text(
+                    value ?? '',
+                    style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w700),
+                  ),
               ],
             ),
           ),
-          Icon(icon, size: 18, color: colors.mutedText),
+          IconButton(
+            onPressed: onPlus,
+            icon: const Icon(Icons.add),
+          ),
         ],
       ),
     );
@@ -876,7 +1083,9 @@ class _WatchlistState extends State<_Watchlist> {
                           crossAxisAlignment: CrossAxisAlignment.end,
                           children: [
                             Text(
-                              quote == null ? '-' : AppUtils.formatPrice(quote.price),
+                              quote == null
+                                  ? '-'
+                                  : OtcAssets.formatAssetPrice(asset.symbol, quote.price),
                               style: Theme.of(context).textTheme.labelSmall,
                             ),
                             Text(

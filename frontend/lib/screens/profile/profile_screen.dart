@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../core/l10n/app_strings.dart';
 import '../../core/routes/app_routes.dart';
 import '../../core/services/app_scope.dart';
 import '../../core/theme/app_colors.dart';
@@ -86,6 +87,41 @@ class ProfileScreen extends StatelessWidget {
                         ),
                       ],
                     ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 20),
+            SectionHeader(title: AppStrings.of(context).wallet),
+            const SizedBox(height: 10),
+            PremiumCard(
+              padding: EdgeInsets.zero,
+              child: Column(
+                children: [
+                  ListTile(
+                    leading: const Icon(Icons.south_west_rounded),
+                    title: Text(AppStrings.of(context).deposit),
+                    trailing: const Icon(Icons.chevron_right),
+                    onTap: () => Navigator.of(context).pushNamed(AppRoutes.liveDeposit),
+                  ),
+                  ListTile(
+                    leading: const Icon(Icons.north_east_rounded),
+                    title: Text(AppStrings.of(context).withdraw),
+                    trailing: const Icon(Icons.chevron_right),
+                    onTap: () => Navigator.of(context).pushNamed(AppRoutes.liveWithdraw),
+                  ),
+                  ListTile(
+                    leading: const Icon(Icons.receipt_long_outlined),
+                    title: Text(AppStrings.of(context).depositHistory),
+                    trailing: const Icon(Icons.chevron_right),
+                    onTap: () => Navigator.of(context).pushNamed(AppRoutes.depositHistory),
+                  ),
+                  ListTile(
+                    leading: const Icon(Icons.outbox_outlined),
+                    title: Text(AppStrings.of(context).withdrawalHistory),
+                    trailing: const Icon(Icons.chevron_right),
+                    onTap: () =>
+                        Navigator.of(context).pushNamed(AppRoutes.withdrawalHistory),
                   ),
                 ],
               ),

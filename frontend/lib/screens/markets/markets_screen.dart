@@ -4,7 +4,8 @@ import '../../core/constants/otc_assets.dart';
 import '../../core/services/app_scope.dart';
 import '../../core/theme/app_colors.dart';
 import '../../models/otc_asset.dart';
-import '../../widgets/cards/asset_grid.dart';
+import '../../core/l10n/app_strings.dart';
+import '../../widgets/cards/asset_list_tile.dart';
 import '../../widgets/layout/responsive_body.dart';
 import '../../widgets/layout/section_header.dart';
 
@@ -33,7 +34,7 @@ class _MarketsScreenState extends State<MarketsScreen> {
     return Scaffold(
       backgroundColor: Colors.transparent,
       appBar: AppBar(
-        title: const Text('Markets'),
+        title: Text(AppStrings.of(context).navMarkets),
         automaticallyImplyLeading: false,
       ),
       body: ResponsiveBody(
@@ -90,7 +91,10 @@ class _MarketsScreenState extends State<MarketsScreen> {
                   children: [
                     SectionHeader(title: OtcAssets.categoryLabel(category)),
                     const SizedBox(height: 12),
-                    AssetGrid(assets: assets),
+                    for (final asset in assets) ...[
+                      AssetListTile(asset: asset),
+                      const SizedBox(height: 8),
+                    ],
                     const SizedBox(height: 24),
                   ],
                 );

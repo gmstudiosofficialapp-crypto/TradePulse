@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:qr_flutter/qr_flutter.dart';
 import 'package:tradepulse_frontend/core/routes/app_router.dart';
 import 'package:tradepulse_frontend/core/services/app_scope.dart';
 import 'package:tradepulse_frontend/core/services/auth_controller.dart';
@@ -41,7 +42,7 @@ class _DepositTrading extends TradingService {
     required String txid,
   }) async {
     return {
-      'message': 'Your request is under review.',
+      'message': 'Your request has been received.',
       'balance_credited': false,
       'live_balance': 0,
       'request': {
@@ -211,8 +212,9 @@ void main() {
   });
 
   test('live deposit amount bounds', () {
-    expect(Validators.liveDepositAmount('9.99'), 'Minimum deposit is \$10.00.');
-    expect(Validators.liveDepositAmount('10'), isNull);
+    expect(Validators.liveDepositAmount('9.99'), Validators.depositMinMessage);
+    expect(Validators.liveDepositAmount('49.99'), Validators.depositMinMessage);
+    expect(Validators.liveDepositAmount('50'), isNull);
     expect(Validators.liveDepositAmount('10000'), isNull);
     expect(Validators.liveDepositAmount('10000.01'), 'Maximum deposit is \$10,000.00.');
   });
@@ -428,6 +430,7 @@ void main() {
       expect(find.text(asset.title), findsWidgets);
       expect(find.text(address), findsOneWidget);
       expect(find.text(r'$100.00'), findsOneWidget);
+      expect(find.byType(QrImageView), findsOneWidget);
       await tester.pageBack();
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 400));
@@ -465,7 +468,7 @@ void main() {
     await tester.ensureVisible(find.widgetWithText(FilledButton, 'Continue'));
     await tester.tap(find.widgetWithText(FilledButton, 'Continue'));
     await tester.pump();
-    expect(find.text('Minimum deposit is \$10.00.'), findsOneWidget);
+    expect(find.text(Validators.depositMinMessage), findsOneWidget);
 
     await tester.enterText(find.widgetWithText(TextFormField, 'Custom amount'), '10000.01');
     await tester.tap(find.widgetWithText(FilledButton, 'Continue'));
@@ -476,10 +479,16 @@ void main() {
     await tester.tap(find.widgetWithText(FilledButton, 'Continue'));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 400));
+    await tester.dragUntilVisible(
+      find.widgetWithText(TextFormField, 'Transaction ID / TXID'),
+      find.byType(ListView).last,
+      const Offset(0, -180),
+    );
     await tester.enterText(
       find.widgetWithText(TextFormField, 'Transaction ID / TXID'),
       'abcxyz7iZiy6Y3zt',
     );
+    await tester.ensureVisible(find.text('Submit Deposit'));
     await tester.tap(find.text('Submit Deposit'));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 400));

@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../../core/l10n/app_strings.dart';
+import '../../core/routes/app_routes.dart';
 import 'shell_destinations.dart';
 
 class AppBottomNav extends StatelessWidget {
@@ -28,9 +30,20 @@ class AppBottomNav extends StatelessWidget {
           NavigationDestination(
             icon: Icon(item.icon),
             selectedIcon: Icon(item.selectedIcon),
-            label: item.label,
+            label: _label(AppStrings.of(context), item.route),
           ),
       ],
     );
+  }
+
+  String _label(AppStrings strings, String route) {
+    return switch (route) {
+      AppRoutes.home => strings.navHome,
+      AppRoutes.markets => strings.navMarkets,
+      AppRoutes.trade => strings.navTrade,
+      AppRoutes.history => strings.navHistory,
+      AppRoutes.profile => strings.navProfile,
+      _ => route,
+    };
   }
 }

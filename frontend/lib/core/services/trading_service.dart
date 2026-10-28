@@ -36,7 +36,9 @@ class TradingService {
     }
     if (response.statusCode == 200) {
       applySignupBonusPayload(response.body);
+      return;
     }
+    throw Exception('Unable to open trading account');
   }
 
   Future<double> getLiveBalance(String userId) async {
@@ -217,6 +219,17 @@ class TradingService {
   Future<DemoStatistics> getStatistics(String userId) async {
     final response = await http.get(
       Uri.parse('$httpBase/api/demo/statistics'),
+      headers: await _headers(),
+    );
+    if (response.statusCode != 200) return const DemoStatistics();
+    return DemoStatistics.fromJson(
+      jsonDecode(response.body) as Map<String, dynamic>,
+    );
+  }
+
+  Future<DemoStatistics> getLiveStatistics(String userId) async {
+    final response = await http.get(
+      Uri.parse('$httpBase/api/live/statistics'),
       headers: await _headers(),
     );
     if (response.statusCode != 200) return const DemoStatistics();

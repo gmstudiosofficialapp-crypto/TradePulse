@@ -3,8 +3,7 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from threading import Lock
 
-SIGNUP_LIVE_BONUS = 0.0
-INITIAL_LIVE_BALANCE = 0.0
+SIGNUP_LIVE_BONUS = 10.0
 
 
 class MemoryAccountStore:
@@ -67,12 +66,12 @@ class MemoryAccountStore:
             }
             self._users[user_id] = row
             self._balances[user_id] = round(self.initial, 2)
-            self._live_balances[user_id] = INITIAL_LIVE_BALANCE
-            self._bonus_granted[user_id] = False
+            self._live_balances[user_id] = SIGNUP_LIVE_BONUS
+            self._bonus_granted[user_id] = True
             return {
                 **row,
-                "signup_bonus_granted": False,
-                "signup_bonus_just_granted": False,
+                "signup_bonus_granted": True,
+                "signup_bonus_just_granted": True,
             }
 
     def get_user(self, user_id: str) -> dict | None:

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../core/constants/otc_assets.dart';
 import '../../core/services/app_scope.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/utils/app_utils.dart';
@@ -23,8 +24,8 @@ class _HistoryScreenState extends State<HistoryScreen> {
   Widget build(BuildContext context) {
     final colors = context.tpColors;
     final trading = TradingScope.maybeOf(context);
-    final stats = trading?.statistics;
-    final trades = (trading?.history ?? [])
+    final stats = trading?.liveStatistics;
+    final trades = (trading?.liveHistory ?? [])
         .where((trade) => trade.result != null)
         .where((trade) => _filter == 'ALL' || trade.result == _filter)
         .toList();
@@ -47,7 +48,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
               ),
               const SizedBox(height: 4),
               Text(
-                'Closed positions on this account',
+                'Closed Live positions on this account',
                 style: Theme.of(context).textTheme.bodySmall?.copyWith(
                       color: colors.mutedText,
                     ),
@@ -84,7 +85,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
               if (trades.isEmpty)
                 const EmptyState(
                   title: 'No trades yet',
-                  message: 'Your completed trades will appear here.',
+                  message: 'Your completed Live trades will appear here.',
                   icon: Icons.history,
                 )
               else
@@ -134,7 +135,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
                             children: [
                               _Meta(
                                 'Entry',
-                                '${AppUtils.formatPrice(entry.value.entryPrice)} → ${entry.value.expiryPrice == null ? 'pending' : AppUtils.formatPrice(entry.value.expiryPrice!)}',
+                                '${OtcAssets.formatAssetPrice(entry.value.asset, entry.value.entryPrice)} → ${entry.value.expiryPrice == null ? 'pending' : OtcAssets.formatAssetPrice(entry.value.asset, entry.value.expiryPrice!)}',
                               ),
                               _Meta('Stake', AppUtils.formatMoney(entry.value.stake)),
                               _Meta('Payout', entry.value.payoutLabel),
