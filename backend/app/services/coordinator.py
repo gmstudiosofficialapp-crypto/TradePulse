@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import Awaitable, Callable
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 from app.services.demo_trading import DemoTradingEngine
 from app.services.ground_truth import peek_reference_direction
@@ -11,6 +11,29 @@ from market_engine.services.market_runtime import MarketRuntime
 from signal_engine.services.engine import SignalEngine
 
 EventHandler = Callable[[dict], Awaitable[None] | None]
+
+
+def _as_utc(value) -> datetime:
+    if isinstance(value, datetime):
+        moment = value
+    else:
+        moment = datetime.fromisoformat(str(value).replace("Z", "+00:00"))
+    if moment.tzinfo is None:
+        return moment.replace(tzinfo=timezone.utc)
+    return moment.astimezone(timezone.utc)
+
+
+def _wall_clock() -> datetime:
+    return datetime.now(timezone.utc)
+
+
+def _trade_due_at(trade: dict) -> datetime:
+    """Settle after the selected duration from entry for every expiry option."""
+    entry = _as_utc(trade["entry_time"])
+    seconds = int(trade.get("expiry_seconds") or 0)
+    if seconds > 0:
+        return entry + timedelta(seconds=seconds)
+    return _as_utc(trade["expiry_time"])
 
 
 class Phase3Coordinator:
@@ -81,13 +104,16 @@ class Phase3Coordinator:
         now: datetime,
         preferred: dict[str, float] | None = None,
     ) -> None:
-        moment = now if now.tzinfo else now.replace(tzinfo=timezone.utc)
+        tick_time = _as_utc(now)
+        wall = _wall_clock()
+        moment = tick_time if tick_time <= wall else wall
         preferred = preferred or {}
         for trade in list(self.trading.open_snapshot()):
-            expiry = datetime.fromisoformat(trade["expiry_time"])
-            if expiry.tzinfo is None:
-                expiry = expiry.replace(tzinfo=timezone.utc)
-            if expiry > moment:
+            try:
+                due = _trade_due_at(trade)
+            except (KeyError, TypeError, ValueError):
+                continue
+            if due > moment:
                 continue
             price = preferred.get(trade["asset"])
             if price is None:
