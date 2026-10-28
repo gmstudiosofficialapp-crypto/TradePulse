@@ -161,9 +161,6 @@ class TradingController extends ChangeNotifier {
       if (epoch == _balanceEpoch) {
         balance = nextBalance;
       }
-      if (asset != null) {
-        await loadSignal(asset);
-      }
       if (error == 'Trading account unreachable') {
         error = null;
       }
@@ -312,22 +309,8 @@ class TradingController extends ChangeNotifier {
 
   void applyEvent(Map<String, dynamic> event) {
     final type = event['type'];
-    if ((type == 'signal_created' || type == 'signal_closed') && event['signal'] is Map) {
-      final parsed = TradeSignal.fromJson(
-        Map<String, dynamic>.from(event['signal'] as Map),
-      );
-      if (parsed.isDirectional) {
-        _upsertSignal(parsed);
-        final open = activeSignalsFor(parsed.asset);
-        if (open.isNotEmpty) {
-          open.sort((a, b) => (b.generatedAt ?? DateTime.fromMillisecondsSinceEpoch(0))
-              .compareTo(a.generatedAt ?? DateTime.fromMillisecondsSinceEpoch(0)));
-          signal = open.first;
-        } else {
-          signal = parsed;
-        }
-        notifyListeners();
-      }
+    if (type == 'signal_created' || type == 'signal_closed') {
+      return;
     }
     if (type == 'trade_opened' || type == 'trade_result' || type == 'trade_expired') {
       if (!_ownsAccountEvent(event)) return;

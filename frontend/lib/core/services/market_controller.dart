@@ -4,7 +4,6 @@ import 'dart:math' as math;
 import 'package:flutter/foundation.dart';
 
 import '../../models/market_models.dart';
-import '../chart/candle_timeframe.dart';
 import 'market_data_service.dart';
 
 class MarketController extends ChangeNotifier {
@@ -13,9 +12,7 @@ class MarketController extends ChangeNotifier {
   final MarketDataService _service;
   final Map<String, MarketQuote> quotes = {};
   final Map<String, List<double>> priceTrail = {};
-  List<MarketCandle> _minutes = [];
   List<MarketCandle> candles = [];
-  int chartTimeframe = 60;
   MarketStatus status = const MarketStatus(
     state: EngineState.offline,
     simulated: true,
@@ -43,15 +40,6 @@ class MarketController extends ChangeNotifier {
   }
 
   Future<void> identify(String userId) => _service.identify(userId);
-
-  void setChartTimeframe(int seconds) {
-    if (!CandleTimeframe.options.contains(seconds) || chartTimeframe == seconds) {
-      return;
-    }
-    chartTimeframe = seconds;
-    _rebuildDisplay();
-    notifyListeners();
-  }
 
   Future<void> refresh() async {
     try {
@@ -90,8 +78,7 @@ class MarketController extends ChangeNotifier {
       await _service.unsubscribeAsset(focusedAsset);
     }
     focusedAsset = asset;
-    _minutes = await _service.getHistoricalCandles(asset);
-    _rebuildDisplay();
+    candles = await _service.getHistoricalCandles(asset);
     await _service.subscribeAsset(asset);
     final quote = quotes[asset];
     if (quote != null) {
@@ -115,69 +102,46 @@ class MarketController extends ChangeNotifier {
 
   void _onCandle(MarketCandle candle) {
     if (candle.asset != focusedAsset) return;
-    _upsertMinute(candle);
-    _rebuildDisplay();
+    _upsertCandle(candle);
     notifyListeners();
   }
 
-  void _upsertMinute(MarketCandle candle) {
+  void _upsertCandle(MarketCandle candle) {
     final key = candle.minuteKey;
-    final index = _minutes.indexWhere((item) => item.minuteKey == key);
+    final index = candles.indexWhere((item) => item.minuteKey == key);
     if (index >= 0) {
-      final current = _minutes[index];
+      final current = candles[index];
       if (current.closed && !candle.closed) return;
-      final next = [..._minutes];
+      final next = [...candles];
       next[index] = candle;
-      _minutes = next;
+      candles = next;
     } else {
-      _minutes = [..._minutes, candle]
-        ..sort((a, b) => a.openTime.compareTo(b.openTime));
+      candles = [...candles, candle]..sort((a, b) => a.openTime.compareTo(b.openTime));
     }
-    if (_minutes.length > 360) {
-      _minutes = _minutes.sublist(_minutes.length - 360);
+    if (candles.length > 360) {
+      candles = candles.sublist(candles.length - 360);
     }
-  }
-
-  void _rebuildDisplay({MarketCandle? liveOverride}) {
-    final closed = _minutes.where((item) => item.closed).toList();
-    final expanded = CandleTimeframe.fromMinutes(
-      closed,
-      seconds: chartTimeframe,
-    );
-    final liveMinute = _minutes.isEmpty ? null : _minutes.last;
-    if (liveMinute != null && !liveMinute.closed) {
-      final stamp = liveMinute.closeTime.toUtc();
-      final start = CandleTimeframe.bucketStart(stamp, chartTimeframe);
-      expanded.add(
-        liveOverride ??
-            MarketCandle(
-              asset: liveMinute.asset,
-              open: liveMinute.close,
-              high: liveMinute.close,
-              low: liveMinute.close,
-              close: liveMinute.close,
-              volume: 1,
-              openTime: start,
-              closeTime: start.add(Duration(seconds: chartTimeframe)),
-              closed: false,
-            ),
-      );
-    }
-    candles = expanded;
   }
 
   void _applyLivePrice(String asset, double price, DateTime? timestamp) {
-    if (asset != focusedAsset) return;
+    if (asset != focusedAsset || candles.isEmpty) return;
+    final last = candles.last;
+    if (!last.closed &&
+        timestamp != null &&
+        timestamp.isBefore(last.closeTime.toUtc())) {
+      return;
+    }
     final stamp = timestamp ?? DateTime.now().toUtc();
-    final minuteBucket = DateTime.utc(
+    final bucket = DateTime.utc(
       stamp.year,
       stamp.month,
       stamp.day,
       stamp.hour,
       stamp.minute,
     );
-    if (_minutes.isEmpty) {
-      _upsertMinute(
+    if (last.closed) {
+      if (bucket.millisecondsSinceEpoch ~/ 60000 == last.minuteKey) return;
+      _upsertCandle(
         MarketCandle(
           asset: asset,
           open: price,
@@ -185,92 +149,38 @@ class MarketController extends ChangeNotifier {
           low: price,
           close: price,
           volume: 1,
-          openTime: minuteBucket,
+          openTime: bucket,
           closeTime: stamp,
           closed: false,
         ),
       );
-    } else {
-      final last = _minutes.last;
-      if (last.closed) {
-        if (minuteBucket.millisecondsSinceEpoch ~/ 60000 != last.minuteKey) {
-          _upsertMinute(
-            MarketCandle(
-              asset: asset,
-              open: price,
-              high: price,
-              low: price,
-              close: price,
-              volume: 1,
-              openTime: minuteBucket,
-              closeTime: stamp,
-              closed: false,
-            ),
-          );
-        }
-      } else if (minuteBucket.millisecondsSinceEpoch ~/ 60000 != last.minuteKey) {
-        _upsertMinute(
-          last.copyWith(closed: true, closeTime: minuteBucket),
-        );
-        _upsertMinute(
-          MarketCandle(
-            asset: asset,
-            open: price,
-            high: price,
-            low: price,
-            close: price,
-            volume: 1,
-            openTime: minuteBucket,
-            closeTime: stamp,
-            closed: false,
-          ),
-        );
-      } else {
-        _minutes = [
-          ..._minutes.sublist(0, _minutes.length - 1),
-          last.copyWith(
-            close: price,
-            high: math.max(last.high, price),
-            low: math.min(last.low, price),
-            closeTime: stamp,
-          ),
-        ];
-      }
+      return;
     }
-
-    final start = CandleTimeframe.bucketStart(stamp, chartTimeframe);
-    MarketCandle? liveBar;
-    if (candles.isNotEmpty) {
-      final lastBar = candles.last;
-      if (!lastBar.closed && lastBar.openTime.toUtc() == start) {
-        liveBar = lastBar.copyWith(
+    if (bucket.millisecondsSinceEpoch ~/ 60000 != last.minuteKey) {
+      _upsertCandle(
+        MarketCandle(
+          asset: asset,
+          open: price,
+          high: price,
+          low: price,
           close: price,
-          high: math.max(lastBar.high, price),
-          low: math.min(lastBar.low, price),
+          volume: 1,
+          openTime: bucket,
           closeTime: stamp,
-        );
-      }
+          closed: false,
+        ),
+      );
+      return;
     }
-    liveBar ??= MarketCandle(
-      asset: asset,
-      open: price,
-      high: price,
-      low: price,
-      close: price,
-      volume: 1,
-      openTime: start,
-      closeTime: stamp,
-      closed: false,
-    );
-    _rebuildDisplay(liveOverride: liveBar);
-    if (candles.isNotEmpty && candles.last.openTime.toUtc() == start) {
-      candles = [...candles.sublist(0, candles.length - 1), liveBar];
-    } else {
-      candles = [...candles, liveBar];
-      if (candles.length > 240) {
-        candles = candles.sublist(candles.length - 240);
-      }
-    }
+    candles = [
+      ...candles.sublist(0, candles.length - 1),
+      last.copyWith(
+        close: price,
+        high: math.max(last.high, price),
+        low: math.min(last.low, price),
+        closeTime: stamp,
+      ),
+    ];
   }
 
   @override

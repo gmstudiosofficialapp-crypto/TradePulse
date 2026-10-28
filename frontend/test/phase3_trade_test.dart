@@ -182,12 +182,13 @@ Widget _harness({
 }
 
 void main() {
-  testWidgets('signal display', (tester) async {
+  testWidgets('trade screen hides signals', (tester) async {
     await tester.pumpWidget(_harness(child: const TradeScreen()));
     await tester.pump();
     expect(find.textContaining('BUY'), findsWidgets);
     expect(find.textContaining('BUY 91%'), findsNothing);
     expect(find.textContaining('Confidence:'), findsNothing);
+    expect(find.textContaining('NO SIGNAL'), findsNothing);
     expect(find.textContaining('SELL 91%'), findsNothing);
   });
 
@@ -463,10 +464,10 @@ void main() {
   testWidgets('expiry chips are present', (tester) async {
     await tester.pumpWidget(_harness(child: const TradeScreen()));
     await tester.pump();
-    expect(find.text('5s'), findsWidgets);
-    expect(find.text('15s'), findsWidgets);
-    expect(find.text('30s'), findsWidgets);
-    expect(find.text('1m'), findsWidgets);
+    expect(find.text('5s'), findsOneWidget);
+    expect(find.text('15s'), findsOneWidget);
+    expect(find.text('30s'), findsOneWidget);
+    expect(find.text('1m'), findsOneWidget);
     expect(find.text('5m'), findsOneWidget);
     expect(find.text('15m'), findsOneWidget);
   });

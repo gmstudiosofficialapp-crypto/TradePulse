@@ -69,7 +69,6 @@ class _TradeScreenState extends State<TradeScreen> {
       await market.focusAsset(requested);
     }
     if (!mounted) return;
-    await trading.loadSignal(market.focusedAsset);
     await trading.refresh(asset: market.focusedAsset);
   }
 
@@ -136,8 +135,6 @@ class _TradeScreenState extends State<TradeScreen> {
   Future<void> _selectAsset(String symbol) async {
     final market = AppScope.market(context);
     await market.focusAsset(symbol);
-    if (!mounted) return;
-    await AppScope.trading(context).loadSignal(symbol);
   }
 
   @override
@@ -167,10 +164,6 @@ class _TradeScreenState extends State<TradeScreen> {
     final entries = ChartEntryMarker.uniqueForAsset(market.focusedAsset, [
       ...trading.history,
     ]);
-    final spans = ChartSignalSpan.uniqueForAsset(
-      market.focusedAsset,
-      trading.signalsFor(market.focusedAsset),
-    );
     final actives = trading.activeTrades;
 
     return Scaffold(
@@ -191,14 +184,11 @@ class _TradeScreenState extends State<TradeScreen> {
                 child: CandlestickChart(
                   candles: market.candles,
                   entries: entries,
-                  spans: spans,
                   highlightId: _highlightId,
                   immersive: true,
                   livePrice: quote?.price,
                   feedState: market.status.state,
                   overlayInsets: overlayInsets,
-                  asset: market.focusedAsset,
-                  timeframeSeconds: market.chartTimeframe,
                 ),
               ),
               Positioned(
@@ -214,14 +204,6 @@ class _TradeScreenState extends State<TradeScreen> {
                       onToggleWatchlist: () =>
                           setState(() => _watchlistOpen = !_watchlistOpen),
                     ),
-                    const SizedBox(height: 8),
-                    Align(
-                      alignment: Alignment.centerLeft,
-                      child: _ChartTimeframeBar(
-                        selected: market.chartTimeframe,
-                        onSelect: market.setChartTimeframe,
-                      ),
-                    ),
                     if (!desktop) ...[
                       const SizedBox(height: 8),
                       _AssetChips(
@@ -231,12 +213,6 @@ class _TradeScreenState extends State<TradeScreen> {
                     ],
                   ],
                 ),
-              ),
-              Positioned(
-                top: desktop ? 92 : 148,
-                left: 12,
-                width: math.min(280, constraints.maxWidth - (desktop ? 24 : 24)),
-                child: _SignalBanner(signal: trading.signal),
               ),
               if (_flashResult != null)
                 Positioned(
@@ -313,32 +289,6 @@ class _TradeScreenState extends State<TradeScreen> {
   }
 }
 
-class _ChartTimeframeBar extends StatelessWidget {
-  const _ChartTimeframeBar({
-    required this.selected,
-    required this.onSelect,
-  });
-
-  final int selected;
-  final ValueChanged<int> onSelect;
-
-  @override
-  Widget build(BuildContext context) {
-    return Wrap(
-      spacing: 4,
-      children: [
-        for (final seconds in const [5, 15, 30, 60])
-          ChoiceChip(
-            visualDensity: VisualDensity.compact,
-            label: Text(AppUtils.formatExpiryLabel(seconds)),
-            selected: selected == seconds,
-            onSelected: (_) => onSelect(seconds),
-          ),
-      ],
-    );
-  }
-}
-
 class _AssetChips extends StatelessWidget {
   const _AssetChips({required this.selected, required this.onSelect});
 
@@ -372,59 +322,6 @@ class _AssetChips extends StatelessWidget {
             onSelected: (_) => onSelect(symbol),
           );
         },
-      ),
-    );
-  }
-}
-
-class _SignalBanner extends StatelessWidget {
-  const _SignalBanner({required this.signal});
-
-  final TradeSignal signal;
-
-  @override
-  Widget build(BuildContext context) {
-    final colors = context.tpColors;
-    final buy = signal.direction == 'BUY';
-    final sell = signal.direction == 'SELL';
-    final tone = buy
-        ? colors.success
-        : sell
-            ? colors.danger
-            : colors.mutedText;
-    final remaining = signal.expiryTime == null
-        ? null
-        : signal.expiryTime!.difference(DateTime.now().toUtc()).inSeconds;
-    return PremiumCard(
-      glass: true,
-      padding: const EdgeInsets.fromLTRB(10, 8, 10, 8),
-      child: Row(
-        children: [
-          Icon(
-            buy
-                ? Icons.trending_up
-                : sell
-                    ? Icons.trending_down
-                    : Icons.pause_circle_outline,
-            color: tone,
-          ),
-          const SizedBox(width: 8),
-          Text(
-            'SIGNAL ${signal.direction}',
-            style: TextStyle(fontWeight: FontWeight.w800, color: tone),
-          ),
-          const SizedBox(width: 8),
-          Text(
-            '${(signal.confidence * 100).round()}%',
-            style: TextStyle(color: colors.mutedText, fontWeight: FontWeight.w700),
-          ),
-          const Spacer(),
-          if (remaining != null && remaining > 0)
-            Text(
-              '${remaining}s',
-              style: const TextStyle(fontWeight: FontWeight.w800),
-            ),
-        ],
       ),
     );
   }
@@ -506,7 +403,7 @@ class _TradeTopBar extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.end,
               children: [
                 Text(
-                  price == null ? '—' : OtcAssets.formatAssetPrice(asset, price!),
+                  price == null ? '—' : AppUtils.formatPrice(price!),
                   style: const TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.w700,
@@ -1083,9 +980,7 @@ class _WatchlistState extends State<_Watchlist> {
                           crossAxisAlignment: CrossAxisAlignment.end,
                           children: [
                             Text(
-                              quote == null
-                                  ? '-'
-                                  : OtcAssets.formatAssetPrice(asset.symbol, quote.price),
+                              quote == null ? '-' : AppUtils.formatPrice(quote.price),
                               style: Theme.of(context).textTheme.labelSmall,
                             ),
                             Text(

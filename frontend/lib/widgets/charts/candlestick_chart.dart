@@ -4,7 +4,6 @@ import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
 
-import '../../core/constants/otc_assets.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/utils/app_utils.dart';
 import '../../models/chart_entry.dart';
@@ -22,8 +21,6 @@ class CandlestickChart extends StatefulWidget {
     this.overlayInsets = EdgeInsets.zero,
     this.livePrice,
     this.feedState,
-    this.asset = '',
-    this.timeframeSeconds = 60,
   });
 
   final List<MarketCandle> candles;
@@ -35,8 +32,6 @@ class CandlestickChart extends StatefulWidget {
   final EdgeInsets overlayInsets;
   final double? livePrice;
   final EngineState? feedState;
-  final String asset;
-  final int timeframeSeconds;
 
   @override
   State<CandlestickChart> createState() => _CandlestickChartState();
@@ -113,8 +108,12 @@ class _CandlestickChartState extends State<CandlestickChart>
       }
       return;
     }
-    final alpha = (1 - math.exp(-dt / 0.16)).clamp(0.0, 1.0);
-    final nextClose = _shownClose + (targetClose - _shownClose) * alpha;
+    final alpha = (1 - math.exp(-dt / 0.32)).clamp(0.0, 1.0);
+    var nextClose = _shownClose + (targetClose - _shownClose) * alpha;
+    final scale = math.max(targetClose.abs(), math.max(last.open.abs(), 1e-9));
+    final band = scale * 0.00012;
+    final t = elapsed.inMilliseconds / 1000.0;
+    nextClose += band * (0.55 * math.sin(t * 7.3) + 0.45 * math.sin(t * 11.1));
     final nextHigh = math.max(math.max(_shownHigh, last.open), nextClose);
     final nextLow = math.min(math.min(_shownLow, last.open), nextClose);
     setState(() {
@@ -253,8 +252,6 @@ class _CandlestickChartState extends State<CandlestickChart>
                 priceLine: colors.accent,
                 insets: widget.overlayInsets,
                 following: _following,
-                asset: widget.asset,
-                timeframeSeconds: widget.timeframeSeconds,
               ),
               child: const SizedBox.expand(),
             ),
@@ -279,8 +276,6 @@ class _CandlePainter extends CustomPainter {
     required this.priceLine,
     required this.insets,
     required this.following,
-    required this.asset,
-    required this.timeframeSeconds,
   });
 
   final List<MarketCandle> candles;
@@ -295,8 +290,6 @@ class _CandlePainter extends CustomPainter {
   final Color priceLine;
   final EdgeInsets insets;
   final bool following;
-  final String asset;
-  final int timeframeSeconds;
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -362,12 +355,7 @@ class _CandlePainter extends CustomPainter {
       final y = plot.top + plot.height * i / 4;
       canvas.drawLine(Offset(plot.left, y), Offset(plot.right, y), gridPaint);
       final price = maxP - span * i / 4;
-      _label(
-        canvas,
-        asset.isEmpty ? AppUtils.formatPrice(price) : OtcAssets.formatPriceValue(asset, price),
-        Offset(plot.right + 6, y - 6),
-        labelStyle,
-      );
+      _label(canvas, AppUtils.formatPrice(price), Offset(plot.right + 6, y - 6), labelStyle);
     }
 
     double yFor(double price) {
@@ -376,8 +364,8 @@ class _CandlePainter extends CustomPainter {
 
     final slot = plot.width / candles.length;
     final candleWidth = slot;
-    final bodyWidth = (slot * 0.78).clamp(2.6, 16.0);
-    const wickWidth = 1.0;
+    final bodyWidth = (slot * 0.62).clamp(2.2, 14.0);
+    final wickWidth = 1.15;
 
     canvas.save();
     canvas.clipRect(plot);
@@ -399,24 +387,39 @@ class _CandlePainter extends CustomPainter {
         ..strokeWidth = wickWidth
         ..strokeCap = StrokeCap.square;
       canvas.drawLine(Offset(x, yHigh), Offset(x, yLow), wick);
-      final body = Rect.fromCenter(
-        center: Offset(x, bodyCenterY),
-        width: bodyWidth,
-        height: height,
+      final body = RRect.fromRectAndRadius(
+        Rect.fromCenter(
+          center: Offset(x, bodyCenterY),
+          width: bodyWidth,
+          height: height,
+        ),
+        const Radius.circular(0.6),
       );
-      canvas.drawRect(body, Paint()..color = color);
+      canvas.drawRRect(body, Paint()..color = color);
+      canvas.drawRRect(
+        body,
+        Paint()
+          ..color = color.withValues(alpha: 0.35)
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 0.6,
+      );
     }
     canvas.restore();
 
-    final period = Duration(seconds: timeframeSeconds <= 0 ? 60 : timeframeSeconds);
-
-    double xAt(DateTime time) {
+    double? xAt(DateTime time) {
       final stamp = time.toUtc();
       if (stamp.isBefore(candles.first.openTime.toUtc())) return plot.left;
+      if (!stamp.isBefore(candles.last.closeTime.toUtc()) && candles.last.closed) {
+        return plot.left + (candles.length - 0.5) * candleWidth;
+      }
       for (var i = 0; i < candles.length; i++) {
         final candle = candles[i];
         final open = candle.openTime.toUtc();
-        final close = candle.closed ? candle.closeTime.toUtc() : open.add(period);
+        final close = candle.closed
+            ? candle.closeTime.toUtc()
+            : candle.closeTime.toUtc().isAfter(open.add(const Duration(minutes: 1)))
+                ? candle.closeTime.toUtc()
+                : open.add(const Duration(minutes: 1));
         if (stamp.isBefore(open)) {
           return plot.left + i * candleWidth;
         }
@@ -425,16 +428,10 @@ class _CandlePainter extends CustomPainter {
           final frac = spanMs <= 0
               ? 0.5
               : stamp.difference(open).inMilliseconds / spanMs;
-          return plot.left + i * candleWidth + frac.clamp(0.0, 1.0) * candleWidth;
+          return plot.left + i * candleWidth + frac.clamp(0, 1) * candleWidth;
         }
       }
-      final last = candles.last;
-      final open = last.openTime.toUtc();
-      final elapsed = stamp.difference(open).inMilliseconds;
-      final spanMs = period.inMilliseconds <= 0 ? 1 : period.inMilliseconds;
-      return plot.left +
-          (candles.length - 1) * candleWidth +
-          (elapsed / spanMs) * candleWidth;
+      return plot.left + (candles.length - 0.5) * candleWidth;
     }
 
     for (var index = 0; index < spans.length; index++) {
@@ -456,8 +453,8 @@ class _CandlePainter extends CustomPainter {
       final buy = entry.direction == 'BUY';
       final color = buy ? up : down;
       final y = yFor(entry.entryPrice).clamp(plot.top, plot.bottom);
-      final xEntry = xAt(entry.entryTime).clamp(plot.left, plot.right);
-      final xExp = xAt(entry.expiryAt).clamp(plot.left, plot.right);
+      final xEntry = (xAt(entry.entryTime) ?? plot.left).clamp(plot.left, plot.right);
+      final xExp = (xAt(entry.expiryAt) ?? plot.right).clamp(plot.left, plot.right);
       final accent = highlightId == entry.tradeId;
       final line = Paint()
         ..color = color.withValues(alpha: accent ? 0.95 : 0.72)
@@ -502,12 +499,7 @@ class _CandlePainter extends CustomPainter {
       canvas.drawLine(Offset(x, lastY), Offset(x + 4, lastY), dash);
       x += 8;
     }
-    _priceTag(
-      canvas,
-      Offset(plot.right + 4, lastY),
-      asset.isEmpty ? AppUtils.formatPrice(last) : OtcAssets.formatPriceValue(asset, last),
-      priceLine,
-    );
+    _priceTag(canvas, Offset(plot.right + 4, lastY), AppUtils.formatPrice(last), priceLine);
 
     final step = (candles.length / 4).ceil().clamp(1, candles.length);
     for (var i = 0; i < candles.length; i += step) {
@@ -618,7 +610,6 @@ class _CandlePainter extends CustomPainter {
         oldDelegate.highlightId != highlightId ||
         oldDelegate.entries.length != entries.length ||
         oldDelegate.now != now ||
-        oldDelegate.timeframeSeconds != timeframeSeconds ||
         (candles.isNotEmpty &&
             oldDelegate.candles.isNotEmpty &&
             (oldDelegate.candles.last.close != candles.last.close ||

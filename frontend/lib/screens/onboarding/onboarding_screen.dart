@@ -39,16 +39,16 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
       (
         title: strings.bangla ? 'ডেমোতে অনুশীলন' : 'Practice on Demo',
         body: strings.bangla
-            ? 'ডেমোতে সিগন্যাল ও ট্রেড অনুশীলন করুন।'
-            : 'Practice signals and trades on Demo.',
+            ? 'ডেমো ব্যালেন্স দিয়ে BUY ও SELL অনুশীলন করুন।'
+            : 'Practice BUY and SELL trades with Demo Balance.',
         icon: Icons.school_outlined,
       ),
       (
-        title: strings.bangla ? 'সিগন্যাল কী' : 'What a signal is',
+        title: strings.bangla ? 'ট্রেড কীভাবে' : 'How to trade',
         body: strings.bangla
-            ? 'BUY/SELL/NO SIGNAL ব্যানার পরের ক্যান্ডেলের পূর্বাভাস। এটি গ্যারান্টি নয়।'
-            : 'BUY, SELL, or NO SIGNAL is a forecast for the next candles. It is not a guarantee.',
-        icon: Icons.insights_outlined,
+            ? 'সময় ও অ্যামাউন্ট বেছে BUY বা SELL চাপুন। এক্সপায়ারিতে ফলাফল সেটেল হয়।'
+            : 'Pick time and amount, then tap BUY or SELL. The trade settles at expiry.',
+        icon: Icons.candlestick_chart,
       ),
       (
         title: strings.bangla ? 'লাইভ ডিপোজিট' : 'Live deposits',
