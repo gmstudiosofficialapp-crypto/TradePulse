@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 
-import '../../core/l10n/app_strings.dart';
 import '../../core/services/app_scope.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/utils/app_utils.dart';
@@ -65,30 +64,12 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
                 ],
               ),
             ),
-            if (AppScope.trading(context).statistics.totalTrades > 0)
-              Padding(
-                padding: const EdgeInsets.fromLTRB(20, 0, 20, 12),
-                child: Card(
-                  child: ListTile(
-                    title: Text(AppStrings.of(context).yourToday),
-                    subtitle: Text(
-                      '${AppScope.trading(context).statistics.wins}W / ${AppScope.trading(context).statistics.losses}L',
-                    ),
-                    trailing: Text(
-                      AppUtils.formatSignedMoney(
-                        AppScope.trading(context).statistics.totalProfitLoss,
-                      ),
-                      style: const TextStyle(fontWeight: FontWeight.w800),
-                    ),
-                  ),
-                ),
-              ),
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 20),
               child: Row(
                 children: [
                   SizedBox(
-                    width: 56,
+                    width: 72,
                     child: Text('Rank', style: _headStyle(context)),
                   ),
                   Expanded(child: Text('Name', style: _headStyle(context))),
@@ -102,48 +83,80 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
                   ? const Center(child: CircularProgressIndicator())
                   : ListView.separated(
                       padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
-                      itemCount: _entries.length,
+                      itemCount: _entries.length + 1,
                       separatorBuilder: (_, __) => Divider(
                         height: 1,
                         color: colors.cardBorder.withValues(alpha: 0.5),
                       ),
                       itemBuilder: (context, index) {
+                        if (index == _entries.length) {
+                          return _youRow(context);
+                        }
                         final row = _entries[index];
                         final rank = row['rank'] as int? ?? index + 1;
                         final name = row['name'] as String? ?? '';
                         final win = (row['todays_win'] as num?)?.toDouble() ?? 0;
-                        return Padding(
-                          padding: const EdgeInsets.symmetric(vertical: 12),
-                          child: Row(
-                            children: [
-                              SizedBox(
-                                width: 56,
-                                child: Text(
-                                  '#$rank',
-                                  style: const TextStyle(fontWeight: FontWeight.w800),
-                                ),
-                              ),
-                              Expanded(
-                                child: Text(
-                                  name,
-                                  style: const TextStyle(fontWeight: FontWeight.w600),
-                                ),
-                              ),
-                              Text(
-                                AppUtils.formatMoney(win).replaceAll('.00', ''),
-                                style: TextStyle(
-                                  fontWeight: FontWeight.w700,
-                                  color: colors.accent,
-                                ),
-                              ),
-                            ],
-                          ),
+                        return _rankRow(
+                          rank: '#$rank',
+                          name: name,
+                          amount: AppUtils.formatMoney(win).replaceAll('.00', ''),
+                          amountColor: colors.accent,
                         );
                       },
                     ),
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _youRow(BuildContext context) {
+    final colors = context.tpColors;
+    final trading = AppScope.trading(context);
+    final result = AppScope.settings(context).isLiveMode
+        ? trading.liveStatistics.totalProfitLoss
+        : trading.statistics.totalProfitLoss;
+    final amountColor = result < 0 ? colors.danger : colors.accent;
+    return _rankRow(
+      rank: '100+',
+      name: 'You',
+      amount: AppUtils.formatSignedMoney(result),
+      amountColor: amountColor,
+    );
+  }
+
+  Widget _rankRow({
+    required String rank,
+    required String name,
+    required String amount,
+    required Color amountColor,
+  }) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 12),
+      child: Row(
+        children: [
+          SizedBox(
+            width: 72,
+            child: Text(
+              rank,
+              style: const TextStyle(fontWeight: FontWeight.w800),
+            ),
+          ),
+          Expanded(
+            child: Text(
+              name,
+              style: const TextStyle(fontWeight: FontWeight.w600),
+            ),
+          ),
+          Text(
+            amount,
+            style: TextStyle(
+              fontWeight: FontWeight.w700,
+              color: amountColor,
+            ),
+          ),
+        ],
       ),
     );
   }
